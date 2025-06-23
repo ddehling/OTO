@@ -2,9 +2,9 @@ import time
 import heapq
 import numpy as np
 import cv2
-import corefunctions.soundtestthreaded as sound
+
 import corefunctions.ImageToDMX as imdmx
-import corefunctions.newrender as sr
+from corefunctions.strips import *
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import threading
@@ -75,31 +75,12 @@ class EventScheduler:
         self.state = {}
         
         # Define dimensions for multiple frames
-        frame_dimensions = [
-            (120, 60),   # Frame 0 (primary/main display)
-            (300, 32),   # Frame 1 (secondary display)
-        ]
-        
-        # Initialize renderer with multiple frames
-        self.renderer = sr.ImageRenderer(
-            frame_dimensions=frame_dimensions,
-            enable_lighting=True
-        )
-        
-        # Create array of scenes for each frame
-        self.state['render'] = []
-        for frame_id in range(len(frame_dimensions)):
-            self.state['render'].append(sr.Scene(self.renderer, frame_id=frame_id))
-        
+        self.strip_manager = StripLoader.from_json("C:\\Users\\diete\\Desktop\\devel-local\\Out The Other\\OTO\\strips.json")  # noqa: F405
+        self.state['buffers'] = BufferManager(self.strip_manager)# noqa: F405
+        self.state['output']=self.strip_manager.create_buffers()
         self.state['last_time'] = time.time()
-        self.state['soundengine'] = sound.ThreadedAudioEngine()
-        self.state['soundengine'].start()
         self.state['current_time'] = time.time()
-        self.state['wind'] = 0
-        self.state['tree_frame'] = np.zeros((60, 120, 4))
-        self.state['rainrate'] = 0.5
-        self.state['thunderrate'] = 0.0
-        self.state['starryness'] = 0.0
+
         self.state['simulate'] = True
         self.state['osc_messages'] = []
         
@@ -143,14 +124,7 @@ class EventScheduler:
             ]
         ]
         
-        # Create pixel senders for each display
-        self.state['screens'] = []
-        for i in range(len(receivers)):
-            if i < len(receivers):
-                self.state['screens'].append(imdmx.SACNPixelSender(receivers[i]))
-            else:
-                # For displays without physical receivers, add None as placeholder
-                self.state['screens'].append(None)
+
         
         # Initialize OSC server and message queue
         self.osc_messages = queue.Queue(maxsize=1000)
@@ -221,9 +195,6 @@ class EventScheduler:
         self.event_queue = []
         self.active_events = []
 
-    def set_fog(self, frame_id, amount, color=None, dir_scale=None):
-        """Convenience method to set fog parameters for a specific frame"""
-        self.renderer.set_fog(frame_id, amount, color, dir_scale)
 
     def update(self):
         # Process OSC messages if needed
@@ -248,51 +219,33 @@ class EventScheduler:
         
         self.state['last_time'] = self.state['current_time']
         
+        self.state['buffers'].merge_buffers(self.state['output'])
         # Render all frames
-        frames = []
-        for scene in self.state['render']:
-            frames.append(scene.render())
+        # frames = []
+        # for scene in self.state['render']:
+        #     frames.append(scene.render())
         
-        # Process and send frames to physical displays
-        gamma = 2.8
-        display_frames = []  # Store processed frames for simulation
+        # # Process and send frames to physical displays
+        # gamma = 2.8
+        # display_frames = []  # Store processed frames for simulation
         
-        for i, frame in enumerate(frames):
-            # Convert from RGBA to BGR for OpenCV and sACN
-            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
+        # for i, frame in enumerate(frames):
+        #     # Convert from RGBA to BGR for OpenCV and sACN
+        #     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR)
             
-            # Store original frame for simulation
-            if self.state['simulate']:
-                display_frames.append(frame_bgr.copy())
+        #     # Store original frame for simulation
+        #     if self.state['simulate']:
+        #         display_frames.append(frame_bgr.copy())
             
-            # Apply gamma correction
-            frame_bgr = np.power(frame_bgr / 255.0, gamma) * 255.0
-            frame_bgr = frame_bgr.astype(np.uint8)
+        #     # Apply gamma correction
+        #     frame_bgr = np.power(frame_bgr / 255.0, gamma) * 255.0
+        #     frame_bgr = frame_bgr.astype(np.uint8)
             
-            # Send to physical display if a screen sender exists
-            if i < len(self.state['screens']) and self.state['screens'][i] is not None:
-                try:
-                    # Send with RGB channels swapped to match the hardware expectation
-                    self.state['screens'][i].send(frame_bgr[:, :, [2, 1, 0]])
-                except OSError as e:
-                    print(f"Network error while sending sACN data to display {i}: {e}")
+        #     # Send to physical display if a screen sender exists
+        #     if i < len(self.state['screens']) and self.state['screens'][i] is not None:
+        #         try:
+        #             # Send with RGB channels swapped to match the hardware expectation
+        #             self.state['screens'][i].send(frame_bgr[:, :, [2, 1, 0]])
+        #         except OSError as e:
+        #             print(f"Network error while sending sACN data to display {i}: {e}")
 
-        # Display frames in simulation mode
-        if self.state['simulate']:
-            window_names = ["Frame 0", "Frame 1", "Frame 2", "Frame 3", "Frame 4"]  # Add more if needed
-            window_sizes = [(900, 450), (900, 96), (400, 400), (400, 400), (400, 400)]  # Default sizes
-            
-            for i, frame in enumerate(display_frames):
-                if i < len(window_names):
-                    win_name = window_names[i]
-                else:
-                    win_name = f"Frame {i}"
-                    
-                cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
-                
-                if i < len(window_sizes):
-                    cv2.resizeWindow(win_name, *window_sizes[i])
-                    
-                cv2.imshow(win_name, frame)
-                
-            cv2.waitKey(1)

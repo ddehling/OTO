@@ -1,0 +1,28 @@
+{
+  "strips": [
+    {
+      "id": "left_ear_1",
+      "length": 150,
+      "groups": ["ceiling", "perimeter"],
+      "metadata": {
+        "Strip_usaage": "Secondary"
+      }
+    },
+    {
+      "id": "left_ear_2",
+      "length": 200,
+      "groups": ["walls", "perimeter", "east"],
+      "metadata": {
+        "Strip_usaage": "Primary"
+      }
+    },
+        {
+      "id": "left_ear_0",
+      "length": 500,
+      "groups": ["walls", "perimeter", "east"],
+      "metadata": {
+        "Strip_usaage": "Secondary"
+      }
+    }
+  ]
+}
