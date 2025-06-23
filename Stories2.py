@@ -17,7 +17,7 @@ from sceneutils.summer_bloom import *  # noqa: F403
 from corefunctions.soundinput import MicrophoneAnalyzer
 from sceneutils.weather_params import WeatherState, DEFAULT_WEATHER_PARAMS, WEATHER_PRESETS
 from sceneutils.celestial_bodies import CELESTIAL_BODIES
-
+#
 class EnvironmentalSystem:
     def __init__(self, scheduler):
         self.scheduler = scheduler
