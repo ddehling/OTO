@@ -86,21 +86,21 @@ if __name__ == "__main__":
     env_system.scheduler.schedule_event(10, 40, OTO_blink)  # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
-    first_time = time.time()
+    first_time = time.perf_counter()
     try:
         while True:
             # Update environmental system
             env_system.update()
 
-            current_time = time.time()
+            current_time = time.perf_counter()
             
             elapsed = current_time - lasttime
             sleep_time = max(0, FRAME_TIME - elapsed)
             #time.sleep(sleep_time)
 
             # Print stats if needed
-            print(["%.2f" % (1/(time.time()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
-            lasttime = time.time()
+            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            lasttime = time.perf_counter()
 
     except KeyboardInterrupt:
         print("Done!")

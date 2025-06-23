@@ -68,6 +68,51 @@ class SACNPixelSender:
                     universe_data = np.pad(universe_data, (0, 510 - universe_data.size), 'constant')
                 self.sender[universe].dmx_data = universe_data.tobytes()
 
+    def send_from_buffers(self, output_buffers, strip_info):
+        """
+        Send pixel data directly from output buffers.
+        
+        :param output_buffers: Dictionary mapping strip_id to buffer arrays
+        :param strip_info: List of tuples (strip_id, length, direction)
+        """
+        for receiver, universes in zip(self.receivers, self.receiver_universes):
+            # Concatenate all strip data for this receiver
+            all_pixel_data = []
+            
+            for strip_id, length, direction in strip_info:
+                # Get the buffer for this strip
+                buffer = output_buffers[strip_id]
+                
+                # Convert from float (0-1) to uint8 (0-255)
+                rgb_data = (buffer[:, :3] * 255).astype(np.uint8)
+                
+                # Reverse the strip if direction is -1
+                if direction == -1:
+                    rgb_data = rgb_data[::-1]
+                    
+                # Add to the concatenated data
+                all_pixel_data.append(rgb_data)
+                
+            # Concatenate all strips
+            receiver_data = np.concatenate(all_pixel_data)
+            
+            # Send data in 170-pixel chunks
+            for i, universe in enumerate(universes):
+                start = i * 170
+                end = min(start + 170, receiver['pixel_count'])
+                
+                # Check if we have enough data
+                if start < len(receiver_data):
+                    # Get the data for this universe
+                    universe_data = receiver_data[start:end].flatten()
+                    
+                    # Pad the last universe if necessary
+                    if universe_data.size < 510:
+                        universe_data = np.pad(universe_data, (0, 510 - universe_data.size), 'constant')
+                        
+                    # Send the data
+                    self.sender[universe].dmx_data = universe_data.tobytes()
+
     def close(self):
         """
         Properly close the sACN sender

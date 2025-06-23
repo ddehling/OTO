@@ -169,13 +169,4 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-misc.ipynb
-test.py
-test.py
-test.py
-memory-bank/activeContext.md
-memory-bank/productContext.md
-memory-bank/progress.md
-memory-bank/projectbrief.md
-memory-bank/systemPatterns.md
-memory-bank/techContext.md
+

@@ -84,7 +84,7 @@ class EventScheduler:
         self.state['simulate'] = True
         self.state['osc_messages'] = []
         self.visualizer = None
-        self.state['visualize'] = True
+        self.state['visualize'] = False
         self.dmx_senders = None
         if self.state['use_dmx']:
             self.dmx_senders = self.strip_manager.create_dmx_senders()
@@ -205,8 +205,8 @@ class EventScheduler:
 
         
         # Update the visualizer if enabled
-        if self.state['visualize'] and self.visualizer is not None:
-            self.visualizer.update(self.state['output'])
+        # if self.state['visualize'] and self.visualizer is not None:
+        #     self.visualizer.update(self.state['output'])
         # Render all frames
         # frames = []
         # for scene in self.state['render']:
