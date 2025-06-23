@@ -2,9 +2,9 @@ import time
 import heapq
 import numpy as np
 import cv2
-
+from corefunctions.visualizers import create_strip_visualizer
 import corefunctions.ImageToDMX as imdmx
-from corefunctions.strips import *
+from corefunctions.strips import *  # noqa: F403
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import threading
@@ -80,51 +80,11 @@ class EventScheduler:
         self.state['output']=self.strip_manager.create_buffers()
         self.state['last_time'] = time.time()
         self.state['current_time'] = time.time()
-
+        self.state['use_dmx'] = True
         self.state['simulate'] = True
         self.state['osc_messages'] = []
-        
-        # Define receivers for each display
-        receivers = [
-            # Primary display receivers (frame 0)
-            [
-                {
-                    'ip': '192.168.68.111',
-                    'pixel_count': 2019,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitA.txt")
-                },
-                {
-                    'ip': '192.168.68.125',
-                    'pixel_count': 1777,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitB.txt")
-                },         
-                {
-                    'ip': '192.168.68.124',
-                    'pixel_count': 1793,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitC.txt")
-                }
-            ],
-            # Secondary display receivers (frame 1)
-            [
-                {
-                    'ip': '192.168.68.130',
-                    'pixel_count': 2160,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitD.txt")
-                },
-                {
-                    'ip': '192.168.68.131',
-                    'pixel_count': 2040,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitE.txt")
-                },
-                {
-                    'ip': '192.168.68.132',
-                    'pixel_count': 2520,
-                    'addressing_array': imdmx.make_indicesHS(r"./DMXconfig/UnitF.txt")
-                }
-            ]
-        ]
-        
-
+        self.visualizer = None
+        self.state['visualize'] = True
         
         # Initialize OSC server and message queue
         self.osc_messages = queue.Queue(maxsize=1000)
@@ -140,6 +100,21 @@ class EventScheduler:
         self.osc_thread = threading.Thread(target=self._run_osc_server)
         self.osc_thread.daemon = True
         self.osc_thread.start()
+
+    def setup_visualizer(self, enable=True):
+        """
+        Set up or disable the OpenCV visualizer for the output buffers.
+        
+        Args:
+            enable: True to enable visualization, False to disable
+        """
+        if enable and self.visualizer is None:
+            self.visualizer = create_strip_visualizer(self.strip_manager)
+            self.state['visualize'] = True
+        elif not enable and self.visualizer is not None:
+            self.visualizer.close()
+            self.visualizer = None
+            self.state['visualize'] = False
 
     def _handle_osc(self, address, *args):
         """Default handler for all OSC messages"""
@@ -220,6 +195,12 @@ class EventScheduler:
         self.state['last_time'] = self.state['current_time']
         
         self.state['buffers'].merge_buffers(self.state['output'])
+        
+
+        
+        # Update the visualizer if enabled
+        if self.state['visualize'] and self.visualizer is not None:
+            self.visualizer.update(self.state['output'])
         # Render all frames
         # frames = []
         # for scene in self.state['render']:

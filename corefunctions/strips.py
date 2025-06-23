@@ -270,14 +270,21 @@ class BufferManager:
                 target_buffer = output_buffers[strip_id]
                 
                 if blend_mode == 'alpha':
-                    # Alpha blending
-                    for i in range(len(target_buffer)):
-                        # Apply generator's global alpha to the pixel alpha
-                        alpha = source_buffer[i, 3] * generator_alpha
-                        if alpha > 0:
-                            # Only blend if source has some opacity
-                            target_buffer[i, :3] = (1 - alpha) * target_buffer[i, :3] + alpha * source_buffer[i, :3]
-                            target_buffer[i, 3] = max(target_buffer[i, 3], alpha)
+                    # Vectorized alpha blending
+                    # Calculate combined alpha values (source alpha * generator alpha)
+                    alphas = source_buffer[:, 3] * generator_alpha
+                    
+                    # Create a mask for pixels with alpha > 0
+                    mask = alphas > 0
+                    
+                    if np.any(mask):  # Only process if there are pixels to blend
+                        # Calculate the blended colors for RGB channels
+                        one_minus_alpha = 1 - alphas[mask, np.newaxis]
+                        target_buffer[mask, :3] = one_minus_alpha * target_buffer[mask, :3] + \
+                                                alphas[mask, np.newaxis] * source_buffer[mask, :3]
+                        
+                        # Update the alpha channel with the maximum value
+                        target_buffer[mask, 3] = np.maximum(target_buffer[mask, 3], alphas[mask])
                             
                 elif blend_mode == 'add':
                     # Additive blending with generator alpha

@@ -5,23 +5,34 @@
       "length": 150,
       "groups": ["ceiling", "perimeter"],
       "metadata": {
-        "Strip_usaage": "Secondary"
+        "Strip_usaage": "Secondary",      
+        "REC_IP":"192.168.68.111",
+      "Strip_num":0,
+      "Direction":1
       }
     },
     {
       "id": "left_ear_2",
       "length": 200,
       "groups": ["walls", "perimeter", "east"],
+
       "metadata": {
-        "Strip_usaage": "Primary"
+        "Strip_usaage": "Primary",
+        "REC_IP":"192.168.68.111",
+      "Strip_num":1,
+      "Direction":-1
       }
     },
         {
       "id": "left_ear_0",
       "length": 500,
       "groups": ["walls", "perimeter", "east"],
+
       "metadata": {
-        "Strip_usaage": "Secondary"
+        "Strip_usaage": "Secondary",
+      "REC_IP":"192.168.68.111",
+      "Strip_num":2,
+      "Direction":1
       }
     }
   ]
