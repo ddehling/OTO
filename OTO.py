@@ -96,7 +96,7 @@ if __name__ == "__main__":
             
             elapsed = current_time - lasttime
             sleep_time = max(0, FRAME_TIME - elapsed)
-            time.sleep(sleep_time)
+            #time.sleep(sleep_time)
 
             # Print stats if needed
             print(["%.2f" % (1/(time.time()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])

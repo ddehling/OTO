@@ -1,9 +1,9 @@
 import time
 import heapq
 import numpy as np
-import cv2
+import cv2  # noqa: F401
 from corefunctions.visualizers import create_strip_visualizer
-import corefunctions.ImageToDMX as imdmx
+import corefunctions.ImageToDMX as imdmx  # noqa: F401
 from corefunctions.strips import *  # noqa: F403
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
@@ -85,6 +85,10 @@ class EventScheduler:
         self.state['osc_messages'] = []
         self.visualizer = None
         self.state['visualize'] = True
+        self.dmx_senders = None
+        if self.state['use_dmx']:
+            self.dmx_senders = self.strip_manager.create_dmx_senders()
+            print(f"Initialized {len(self.dmx_senders)} DMX senders")
         
         # Initialize OSC server and message queue
         self.osc_messages = queue.Queue(maxsize=1000)
@@ -195,7 +199,9 @@ class EventScheduler:
         self.state['last_time'] = self.state['current_time']
         
         self.state['buffers'].merge_buffers(self.state['output'])
-        
+        if self.state['use_dmx'] and self.dmx_senders:
+            self.strip_manager.send_dmx(self.state['output'], self.dmx_senders)
+    
 
         
         # Update the visualizer if enabled

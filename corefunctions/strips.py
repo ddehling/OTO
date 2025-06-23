@@ -119,7 +119,103 @@ class StripManager:
             strip_id: np.zeros((strip.length, 4), dtype=np.float32)  # RGBA
             for strip_id, strip in self.strips.items()
         }
-    
+
+    def create_dmx_senders(self) -> Dict[str, Any]:
+        """Create DMX senders for each unique IP address in strip metadata"""
+        from corefunctions.ImageToDMX import SACNPixelSender
+        
+        # Group strips by IP address
+        ip_strips = {}
+        for strip_id, strip in self.strips.items():
+            ip = strip.metadata.get('REC_IP')
+            if ip:
+                if ip not in ip_strips:
+                    ip_strips[ip] = []
+                ip_strips[ip].append(strip)
+        
+        # Create receivers config for each IP
+        senders = {}
+        for ip, strips in ip_strips.items():
+            # Calculate total pixel count for this IP
+            total_pixels = sum(strip.length for strip in strips)
+            
+            # Create addressing array
+            addressing_array = np.zeros((total_pixels, 2), dtype=np.int32)
+            
+            # Sort strips by Strip_num to ensure correct order
+            strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+            
+            pixel_index = 0
+            for strip in strips:
+                strip_length = strip.length
+                direction = strip.metadata.get('Direction', 1)
+                strip_num = strip.metadata.get('Strip_num', 0)
+                
+                # Create indices for this strip
+                if direction == 1:
+                    # Forward direction
+                    strip_indices = np.array([[strip_num, i] for i in range(strip_length)])
+                else:
+                    # Reverse direction
+                    strip_indices = np.array([[strip_num, strip_length - 1 - i] for i in range(strip_length)])
+                
+                # Add to addressing array
+                addressing_array[pixel_index:pixel_index + strip_length] = strip_indices
+                pixel_index += strip_length
+            
+            # Create receiver configuration
+            receiver_config = {
+                'ip': ip,
+                'pixel_count': total_pixels,
+                'addressing_array': addressing_array
+            }
+            
+            # Create sender for this IP
+            try:
+                sender = SACNPixelSender([receiver_config])
+                senders[ip] = {
+                    'sender': sender,
+                    'strips': strips,
+                    'config': receiver_config
+                }
+            except Exception as e:
+                print(f"Error creating DMX sender for {ip}: {e}")
+        
+        return senders
+
+    def send_dmx(self, output_buffers, dmx_senders):
+        """Send buffer data to DMX receivers"""
+        for ip, sender_info in dmx_senders.items():
+            sender = sender_info['sender']
+            strips = sender_info['strips']
+            
+            # Create a source array for all strips associated with this IP
+            # Using a fixed size array that's large enough for all strips
+            max_strip_num = max(strip.metadata.get('Strip_num', 0) for strip in strips) + 1
+            max_strip_length = max(strip.length for strip in strips)
+            
+            # Create source array with shape (num_strips, max_length, 3) for RGB
+            source_array = np.zeros((max_strip_num + 1, max_strip_length, 3), dtype=np.uint8)
+            
+            # Fill the source array with data from output buffers
+            for strip in strips:
+                strip_id = strip.id
+                strip_num = strip.metadata.get('Strip_num', 0)
+                strip_length = strip.length
+                
+                # Get buffer data and convert to uint8 RGB
+                buffer_data = output_buffers[strip_id]
+                rgb_data = (buffer_data[:, :3] * 255).astype(np.uint8)
+                
+                # Fill source array for this strip
+                source_array[strip_num, :strip_length] = rgb_data
+            
+            # Send to DMX
+            try:
+                sender.send(source_array)
+            except Exception as e:
+                print(f"Error sending DMX data to {ip}: {e}")
+
 class StripLoader:
     """Utilities for loading strip definitions from files"""
     

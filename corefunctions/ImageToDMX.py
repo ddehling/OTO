@@ -48,14 +48,14 @@ class SACNPixelSender:
     def send(self, source_array):
         """
         Send pixel data to all configured receivers based on their addressing arrays.
-        :param source_array: numpy array of shape (width, height, 3) containing source pixel data.
+        :param source_array: numpy array of shape (strips, pixels, 3) containing source pixel data.
         """
-        height, width, _ = source_array.shape
-        
         for receiver, universes in zip(self.receivers, self.receiver_universes):
             # Vectorized extraction of pixel data
-            x_coords = np.clip(receiver['addressing_array'][:, 0], 0, height - 1)
-            y_coords = np.clip(receiver['addressing_array'][:, 1], 0, width - 1)
+            x_coords = np.clip(receiver['addressing_array'][:, 0], 0, source_array.shape[0] - 1)
+            y_coords = np.clip(receiver['addressing_array'][:, 1], 0, source_array.shape[1] - 1)
+            
+            # Extract the RGB values for each pixel
             receiver_data = source_array[x_coords, y_coords]
 
             # Send data in 170-pixel chunks
