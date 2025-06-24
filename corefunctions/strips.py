@@ -48,6 +48,10 @@ class LEDStrip:
             self._generate_circle_coordinates()
         elif self.type == "arc":
             self._generate_arc_coordinates()
+        elif self.type == "concatenated":
+            # For concatenated strips, coordinates are directly set during concatenation
+            # No need to generate anything here
+            pass
         else:
             raise ValueError(f"Unsupported strip type: {self.type}")
     
@@ -210,7 +214,8 @@ class StripManager:
     def __init__(self):
         self.strips: Dict[str, LEDStrip] = {}
         self._groups_cache: Dict[str, List[str]] = {}  # Cache for group lookups
-    
+        self.concatenated_strips: Dict[str, LEDStrip] = {} 
+
     def add_strip(self, strip: LEDStrip) -> None:
         """Add a strip to the collection"""
         self.strips[strip.id] = strip
@@ -321,15 +326,121 @@ class StripManager:
         
         return senders
 
+    def concatenate_strips(self, new_id: str, strip_ids: List[str], join_group: str = None) -> None:
+        """
+        Concatenate multiple strips into a single logical strip.
+        
+        Args:
+            new_id: ID for the new concatenated strip
+            strip_ids: List of strip IDs to concatenate (in order)
+            join_group: Optional group name that these strips belong to
+        """
+        if new_id in self.strips or new_id in self.concatenated_strips:
+            raise ValueError(f"Strip ID '{new_id}' already exists")
+            
+        # Collect strips to concatenate
+        strips_to_join = []
+        for strip_id in strip_ids:
+            if strip_id not in self.strips:
+                raise KeyError(f"Strip '{strip_id}' not found")
+            strips_to_join.append(self.strips[strip_id])
+        
+        if not strips_to_join:
+            raise ValueError("No strips provided for concatenation")
+            
+        # Calculate total length
+        total_length = sum(strip.length for strip in strips_to_join)
+        
+        # Create a new strip
+        concatenated = LEDStrip(
+            id=new_id,
+            length=total_length,
+            type="concatenated",  # Use a special type for concatenated strips
+            groups=strips_to_join[0].groups.copy()  # Start with groups from first strip
+        )
+        
+        # If a join group was specified, add it to the groups
+        if join_group:
+            if join_group not in concatenated.groups:
+                concatenated.groups.append(join_group)
+        
+        # Create combined coordinates array
+        concatenated.coordinates = np.zeros((total_length, 3))
+        
+        # Combine indices and coordinates
+        concatenated.indices = np.arange(total_length)
+        
+        # Store the source strips and their offset in the concatenated strip
+        concatenated.metadata["source_strips"] = []
+        
+        # Fill in coordinates and metadata
+        offset = 0
+        for strip in strips_to_join:
+            # Copy coordinates
+            concatenated.coordinates[offset:offset+strip.length] = strip.coordinates
+            
+            # Store mapping information
+            concatenated.metadata["source_strips"].append({
+                "id": strip.id,
+                "offset": offset,
+                "length": strip.length
+            })
+            
+            # Update offset for next strip
+            offset += strip.length
+            
+            # Merge groups (union)
+            for group in strip.groups:
+                if group not in concatenated.groups:
+                    concatenated.groups.append(group)
+        
+        # Create distance array (normalized position along the strip)
+        concatenated.distance = np.linspace(0, 1, total_length)
+        
+        # Store the concatenated strip
+        self.concatenated_strips[new_id] = concatenated
+        
+        # Also add it to the regular strips collection for unified access
+        self.strips[new_id] = concatenated
+        
+        # Invalidate caches
+        self._invalidate_caches()
+
     def send_dmx(self, output_buffers, dmx_senders):
-        """Send buffer data to DMX receivers"""
+        """Send buffer data to DMX receivers, handling concatenated strips"""
+        # Create a copy of the buffers to modify for concatenated strips
+        processed_buffers = {}
+        
+        # For each strip buffer
+        for strip_id, buffer in output_buffers.items():
+            # If this is a regular strip, just copy the buffer
+            if strip_id not in self.concatenated_strips:
+                processed_buffers[strip_id] = buffer
+            else:
+                # For concatenated strips, we need to copy data to the source strips
+                concatenated = self.concatenated_strips[strip_id]
+                
+                # For each source strip, copy the relevant portion of the buffer
+                for source_info in concatenated.metadata["source_strips"]:
+                    source_id = source_info["id"]
+                    offset = source_info["offset"]
+                    length = source_info["length"]
+                    
+                    # Create a buffer for this source strip if it doesn't exist
+                    if source_id not in processed_buffers:
+                        processed_buffers[source_id] = np.zeros((length, 4), dtype=np.float32)
+                    
+                    # Copy the data from the concatenated buffer to the source buffer
+                    processed_buffers[source_id][:] = buffer[offset:offset+length]
+        
+        # Now send the processed buffers to DMX
         for ip, sender_info in dmx_senders.items():
             sender = sender_info['sender']
             config = sender_info['config']
             
-            # Send to DMX using the direct output buffers
+            # Send to DMX using the processed buffers
             try:
-                sender.send_from_buffers(output_buffers, config['strip_info'])
+                sender.send_from_buffers(processed_buffers, config['strip_info'])
             except Exception as e:
                 print(f"Error sending DMX data to {ip}: {e}")
 

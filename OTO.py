@@ -82,8 +82,8 @@ if __name__ == "__main__":
     scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
-    env_system.scheduler.schedule_event(0, 20, test)
-    env_system.scheduler.schedule_event(10, 40, OTO_blink)  # noqa: F405
+    env_system.scheduler.schedule_event(0, 40, OTO_point_traveler)
+    #env_system.scheduler.schedule_event(10, 40, OTO_blink)  # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()

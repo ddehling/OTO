@@ -116,6 +116,8 @@ def OTO_blink(instate, outstate):
         # Set the pixel in the buffer
         buffer[pixel_idx] = random_color
 
+
+
 def hsv_to_rgb(h, s, v):
     """Convert HSV color to RGB color"""
     h_i = int(h * 6)
@@ -136,3 +138,69 @@ def hsv_to_rgb(h, s, v):
         return t, p, v
     else:
         return v, p, q
+    
+
+# ... existing code ...
+
+def OTO_point_traveler(instate, outstate):
+    """
+    Generator that illuminates a single point moving down the length of left_wall.
+    The point has a random color and pixels fade slowly after the point passes.
+    """
+    name = 'point_traveler'
+    buffers = outstate['buffers']
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        # Initialize position at the start of the strip
+        instate['position'] = 0
+        # Generate a random color for this run
+        instate['color'] = np.append(np.random.random(3), 1.0)
+        return
+
+    if instate['count'] == -1:
+        buffers.generator_alphas[name] = 0
+        return
+
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    
+    # If less than 10 seconds remain, fade the generator alpha
+    if remaining_time < 10.0:
+        # Linear fade from 1.0 to 0.0 over 10 seconds
+        generator_alpha = remaining_time / 10.0
+        # Ensure we don't go below 0
+        generator_alpha = max(0.0, generator_alpha)
+        
+        # Update the generator's alpha value
+        buffers.generator_alphas[name] = generator_alpha
+    else:
+        # Full intensity
+        buffers.generator_alphas[name] = 1.0
+
+    # Get all strip buffers for our generator
+    all_buffers = buffers.get_all_buffers(name)
+    
+    # First, fade all existing pixels by a small amount (slower decay)
+    fade_factor = 0.98  # 2% reduction per frame
+    
+    for strip_id, buffer in all_buffers.items():
+        # Vectorized fade: multiply alpha channel by fade factor
+        buffer[:, 3] *= fade_factor
+    
+    # Focus on the left_wall strip
+    if 'left_wall' in all_buffers:
+        buffer = all_buffers['left_wall']
+        strip_length = len(buffer)
+        
+        # Set the current position to the current color
+        if instate['position'] < strip_length:
+            buffer[instate['position']] = instate['color']
+        
+        # Move the position for the next frame
+        instate['position'] += 1
+        
+        # If we've reached the end, reset position and choose a new color
+        if instate['position'] >= strip_length:
+            instate['position'] = 0
+            instate['color'] = np.append(np.random.random(3), 1.0)
