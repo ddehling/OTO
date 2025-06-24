@@ -9,13 +9,22 @@ from PyQt5.QtCore import Qt, QTimer, QSize, QPoint, QRect
 try:
     from OpenGL.GL import *
     from OpenGL.GLU import *
+    # Import GLUT at module level for text rendering
+    try:
+        from OpenGL.GLUT import *
+        GLUT_AVAILABLE = True
+        glutInit()
+    except ImportError:
+        GLUT_AVAILABLE = False
+        print("GLUT not available. Text rendering will be limited.")
     OPENGL_AVAILABLE = True
 except ImportError:
     OPENGL_AVAILABLE = False
-    print("PyOpenGL not available. Install with: pip install PyOpenGL")
+    GLUT_AVAILABLE = False
+    print("PyOpenGL not available. Install with: pip install PyOpenGL PyOpenGL_accelerate freeglut")
 
 class LED3DVisualizer(QMainWindow):
-    def __init__(self, strip_manager, width=1200, height=800):
+    def __init__(self, strip_manager, width=1800, height=1200):
         # Ensure there's a QApplication instance
         self.app = QApplication.instance()
         if self.app is None:
@@ -39,13 +48,19 @@ class LED3DVisualizer(QMainWindow):
         self.gl_widget = LED3DOpenGLWidget(self.strip_manager)
         main_layout.addWidget(self.gl_widget)
         
-        # Add help label
+        # Add help label with fixed height and alignment
         self.help_label = QLabel()
         self.help_label.setStyleSheet("color: white; background-color: rgba(0,0,0,100);")
         self.help_label.setText(
             "Mouse Controls: Left-drag: Rotate | Right-drag: Pan | Scroll: Zoom | Spacebar: Toggle rotation | R: Reset view"
         )
+        self.help_label.setFixedHeight(30)  # Set a fixed height for the help label
+        self.help_label.setAlignment(Qt.AlignCenter)  # Center the text
         main_layout.addWidget(self.help_label)
+        
+        # Set stretch factors to ensure the GL widget gets most of the space
+        main_layout.setStretchFactor(self.gl_widget, 10)  # Give the GL widget a higher stretch factor
+        main_layout.setStretchFactor(self.help_label, 0)  # Don't
         
         # Set up message queue for thread communication
         self.message_queue = queue.Queue()
@@ -96,7 +111,6 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         
         self.strip_manager = strip_manager
         self.strip_colors = {}
-        self.strip_coordinates = {}
         
         # Camera settings
         self.camera_distance = 15.0
@@ -110,9 +124,6 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         self.right_mouse_pressed = False
         self.auto_rotate = True
         
-        # Label cache for 3D text
-        self.label_cache = {}
-        
         # Set focus to receive key events
         self.setFocusPolicy(Qt.StrongFocus)
         
@@ -122,63 +133,10 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         # Set minimum size
         self.setMinimumSize(QSize(800, 600))
         
-        # Create strip coordinates
-        self._create_strip_coordinates()
-        
         # Set up a timer for continuous rotation
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.animate)
         self.animation_timer.start(30)  # ~33fps
-    
-    def _create_strip_coordinates(self):
-        """Create 3D coordinates for each LED strip"""
-        strip_count = len(self.strip_manager.strips)
-        if strip_count == 0:
-            print("Warning: No strips found in strip_manager")
-            return
-            
-        print(f"Creating 3D coordinates for {strip_count} strips")
-        
-        # Create a circular arrangement of strips
-        radius = 5.0
-        height_offset = -2.0
-        
-        for i, (strip_id, strip) in enumerate(self.strip_manager.strips.items()):
-            # Calculate angle for positioning on a circle
-            angle = (i / strip_count) * 2 * math.pi
-            center_x = radius * math.cos(angle)
-            center_z = radius * math.sin(angle)
-            
-            # Generate positions for each LED in the strip
-            coords = np.zeros((strip.length, 3), dtype=float)
-            
-            # Calculate strip direction vector - slightly tilted outward
-            dx = center_x * 0.1  # Tilt outward slightly
-            dy = 1.0             # Main direction is up
-            dz = center_z * 0.1  # Tilt outward slightly
-            
-            # Normalize direction vector
-            mag = math.sqrt(dx*dx + dy*dy + dz*dz)
-            dx, dy, dz = dx/mag, dy/mag, dz/mag
-            
-            # Scale for strip length in 3D space
-            strip_length = 4.0
-            dx *= strip_length
-            dy *= strip_length
-            dz *= strip_length
-            
-            # Position each LED along this line
-            for j in range(strip.length):
-                t = j / (strip.length - 1) if strip.length > 1 else 0.5
-                coords[j, 0] = center_x + dx * t
-                coords[j, 1] = height_offset + dy * t
-                coords[j, 2] = center_z + dz * t
-            
-            self.strip_coordinates[strip_id] = coords
-            print(f"Created coordinates for strip {strip_id} with {strip.length} LEDs")
-            
-            # Increment height offset for next strip
-            height_offset += 0.5  # Space between strips
     
     def update_colors(self, colors):
         """Update strip colors"""
@@ -257,10 +215,10 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         )
         
         # Draw the coordinate axes
-        self._draw_axes()
+        #self._draw_axes()
         
         # Draw a grid on the ground plane
-        self._draw_grid()
+        #self._draw_grid()
         
         # Draw the LED strips
         self._draw_strips()
@@ -303,13 +261,13 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         
         # Draw grid lines along X axis
         for i in range(-grid_size, grid_size + 1):
-            glVertex3f(-grid_size * grid_step, -2.0, i * grid_step)
-            glVertex3f(grid_size * grid_step, -2.0, i * grid_step)
+            glVertex3f(-grid_size * grid_step, 0.0, i * grid_step)
+            glVertex3f(grid_size * grid_step, 0.0, i * grid_step)
         
         # Draw grid lines along Z axis
         for i in range(-grid_size, grid_size + 1):
-            glVertex3f(i * grid_step, -2.0, -grid_size * grid_step)
-            glVertex3f(i * grid_step, -2.0, grid_size * grid_step)
+            glVertex3f(i * grid_step, 0.0, -grid_size * grid_step)
+            glVertex3f(i * grid_step, 0.0, grid_size * grid_step)
         
         glEnd()
         
@@ -317,19 +275,23 @@ class LED3DOpenGLWidget(QOpenGLWidget):
     
     def _draw_strips(self):
         """Draw all LED strips with their colors"""
-        if not self.strip_coordinates:
+        if not self.strip_manager.strips:
             return
         
         # Draw each strip
-        for strip_id, coords in self.strip_coordinates.items():
+        for strip_id, strip in self.strip_manager.strips.items():
             colors = self.strip_colors.get(strip_id)
+            
+            if strip.coordinates is None or len(strip.coordinates) == 0:
+                print(f"No coordinates available for strip {strip_id}, skipping visualization")
+                continue
             
             # Draw the strip as a line
             glDisable(GL_LIGHTING)  # Disable lighting for the line
             glLineWidth(2.0)
             glBegin(GL_LINE_STRIP)
             glColor3f(0.4, 0.4, 0.4)  # Gray for the strip line
-            for pos in coords:
+            for pos in strip.coordinates:
                 glVertex3f(pos[0], pos[1], pos[2])
             glEnd()
             glLineWidth(1.0)
@@ -337,14 +299,15 @@ class LED3DOpenGLWidget(QOpenGLWidget):
             
             # Draw LED spheres if colors are available
             if colors is not None:
-                for i, pos in enumerate(coords):
+                for i, pos in enumerate(strip.coordinates):
                     if i < len(colors):
                         color = colors[i]
-                        self._draw_led_sphere(pos, 0.15, color)
+                        self._draw_led_sphere(pos, 0.05, color)
             
             # Draw strip ID using billboard technique (facing camera)
-            if len(coords) > 0:
-                pos = coords[0]  # First LED position
+            if len(strip.coordinates) > 0:
+                # Use the first LED position for the label
+                pos = strip.coordinates[0]  
                 self._draw_billboard_text(strip_id, pos[0], pos[1] + 0.3, pos[2])
     
     def _draw_led_sphere(self, position, radius, color):
@@ -364,7 +327,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         # Create a sphere
         quad = gluNewQuadric()
         gluQuadricNormals(quad, GLU_SMOOTH)
-        gluSphere(quad, radius, 10, 10)  # Create the sphere
+        gluSphere(quad, radius, 20, 20)  # Create the sphere
         gluDeleteQuadric(quad)
         
         # Restore the matrix
@@ -372,9 +335,6 @@ class LED3DOpenGLWidget(QOpenGLWidget):
     
     def _draw_billboard_text(self, text, x, y, z):
         """Draw text that always faces the camera (billboard technique)"""
-        # We'll use simple colored cubes or planes instead of text for simplicity
-        # and to avoid Qt painter issues
-        
         glDisable(GL_LIGHTING)
         glColor3f(1.0, 1.0, 0.0)  # Yellow for visibility
         
@@ -384,13 +344,42 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         glPushMatrix()
         glTranslatef(x, y, z)
         
-        # Draw a simple marker
+        # Extract the rotation part of the current modelview matrix
+        # to make the text face the camera
+        modelview = glGetFloatv(GL_MODELVIEW_MATRIX)
+        
+        # Create a billboard matrix that keeps the text facing the camera
+        # by removing the rotation component of the modelview matrix
+        billboard = np.identity(4, dtype=np.float32)
+        billboard[0, 0] = modelview[0, 0]
+        billboard[0, 1] = modelview[1, 0]
+        billboard[0, 2] = modelview[2, 0]
+        billboard[1, 0] = modelview[0, 1]
+        billboard[1, 1] = modelview[1, 1]
+        billboard[1, 2] = modelview[2, 1]
+        billboard[2, 0] = modelview[0, 2]
+        billboard[2, 1] = modelview[1, 2]
+        billboard[2, 2] = modelview[2, 2]
+        
+        # Apply the billboard matrix
+        glMultMatrixf(billboard)
+        
+        # Draw a simple colored quad with the strip ID
         glBegin(GL_QUADS)
-        glVertex3f(-size/2, -size/2, 0)
-        glVertex3f(size/2, -size/2, 0)
-        glVertex3f(size/2, size/2, 0)
-        glVertex3f(-size/2, size/2, 0)
+        glVertex3f(-size, -size/2, 0)
+        glVertex3f(size, -size/2, 0)
+        glVertex3f(size, size/2, 0)
+        glVertex3f(-size, size/2, 0)
         glEnd()
+        
+        # Draw text using OpenGL's bitmap functionality if GLUT is available
+        if GLUT_AVAILABLE:
+            glRasterPos3f(-size*0.8, -size*0.3, 0.01)  # Position text slightly in front of quad
+            glColor3f(0.0, 0.0, 0.0)  # Black text
+            
+            # Draw the text character by character
+            for char in text:
+                glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, ord(char))
         
         glPopMatrix()
         glEnable(GL_LIGHTING)
@@ -487,11 +476,12 @@ class LED3DOpenGLWidget(QOpenGLWidget):
             
         self.update()
 
+
 def create_strip_visualizer(strip_manager):
     """Creates a 3D visualizer for LED strips using PyQt and OpenGL"""
     if not OPENGL_AVAILABLE:
         print("PyOpenGL is required for 3D visualization.")
-        print("Install with: pip install PyOpenGL")
+        print("Install with: pip install PyOpenGL PyOpenGL_accelerate freeglut")
         return None
     
     try:

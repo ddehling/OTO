@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Literal
 import numpy as np
 import json
 import yaml
 import os
+import math
 
 @dataclass
 class LEDStrip:
@@ -12,13 +13,17 @@ class LEDStrip:
     # Basic properties
     id: str                           # Unique identifier for the strip
     length: int                       # Number of LEDs in strip
-      # Primary group this strip belongs to
+    type: Literal["line", "circle"]   # Type of strip (line or circle)
     groups: List[str] = field(default_factory=list)  # All groups this strip belongs to
 
     # Physical properties
     indices: Optional[np.ndarray] = None  # Physical indices if they differ from sequential
-    distance: Optional[np.ndarray] = None
-    coordinates: Optional[np.ndarray] = None
+    coordinates: Optional[np.ndarray] = None  # 3D coordinates of each LED
+    distance: Optional[np.ndarray] = None  # Normalized distance along the strip (0-1)
+    
+    # Position data (stored for reference)
+    position_data: Dict[str, Any] = field(default_factory=dict)
+    
     # Additional custom metadata
     metadata: Dict[str, Any] = field(default_factory=dict)
     
@@ -29,8 +34,71 @@ class LEDStrip:
         if self.indices is None:
             self.indices = np.arange(self.length)
         
-        self.distance=self.indices/self.length
+        # Initialize distance (normalized position along strip)
+        self.distance = self.indices / (self.length - 1) if self.length > 1 else np.zeros(1)
         
+        # Generate 3D coordinates based on type and position data
+        self._generate_coordinates()
+    
+    def _generate_coordinates(self):
+        """Generate 3D coordinates for each LED based on strip type"""
+        if self.type == "line":
+            self._generate_line_coordinates()
+        elif self.type == "circle":
+            self._generate_circle_coordinates()
+        else:
+            raise ValueError(f"Unsupported strip type: {self.type}")
+    
+    def _generate_line_coordinates(self):
+        """Generate coordinates for a line strip"""
+        if "start" not in self.position_data or "end" not in self.position_data:
+            # Create default coordinates if position data not provided
+            self.coordinates = np.zeros((self.length, 3))
+            return
+            
+        start = np.array(self.position_data["start"])
+        end = np.array(self.position_data["end"])
+        
+        # Generate points along the line
+        self.coordinates = np.zeros((self.length, 3))
+        for i in range(self.length):
+            t = i / (self.length - 1) if self.length > 1 else 0
+            self.coordinates[i] = start + t * (end - start)
+    
+    def _generate_circle_coordinates(self):
+        """Generate coordinates for a circular strip"""
+        if "center" not in self.position_data or "radius" not in self.position_data:
+            # Create default coordinates if position data not provided
+            self.coordinates = np.zeros((self.length, 3))
+            return
+            
+        center = np.array(self.position_data["center"])
+        radius = self.position_data["radius"]
+        normal = np.array(self.position_data.get("normal", [0, 1, 0]))
+        start_angle = self.position_data.get("start_angle", 0.0)
+        
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+        
+        # Find perpendicular vectors to the normal to define the circle plane
+        # First perpendicular vector
+        if abs(normal[0]) < abs(normal[1]):
+            perp1 = np.array([1, 0, 0])
+        else:
+            perp1 = np.array([0, 1, 0])
+            
+        perp1 = perp1 - np.dot(perp1, normal) * normal
+        perp1 = perp1 / np.linalg.norm(perp1)
+        
+        # Second perpendicular vector (cross product)
+        perp2 = np.cross(normal, perp1)
+        
+        # Generate points around the circle
+        self.coordinates = np.zeros((self.length, 3))
+        for i in range(self.length):
+            angle = start_angle + (i / self.length) * 2 * np.pi
+            point = center + radius * (perp1 * np.cos(angle) + perp2 * np.sin(angle))
+            self.coordinates[i] = point
 
 
 class StripManager:
@@ -39,7 +107,6 @@ class StripManager:
     def __init__(self):
         self.strips: Dict[str, LEDStrip] = {}
         self._groups_cache: Dict[str, List[str]] = {}  # Cache for group lookups
-        self._themes_cache: Dict[str, List[str]] = {}  # Cache for theme lookups
     
     def add_strip(self, strip: LEDStrip) -> None:
         """Add a strip to the collection"""
@@ -79,19 +146,6 @@ class StripManager:
             for strip_id in self._groups_cache[group]
         }
     
-    def get_strips_by_theme(self, theme: str) -> Dict[str, LEDStrip]:
-        """Get all strips with a specific theme"""
-        if theme not in self._themes_cache:
-            self._themes_cache[theme] = [
-                strip_id for strip_id, strip in self.strips.items()
-                if strip.theme == theme
-            ]
-        
-        return {
-            strip_id: self.strips[strip_id]
-            for strip_id in self._themes_cache[theme]
-        }
-    
     def get_spatial_strips(self, center: Tuple[float, float, float], 
                           radius: float) -> Dict[str, LEDStrip]:
         """Get strips that have LEDs within a sphere of specified radius from center"""
@@ -99,8 +153,11 @@ class StripManager:
         result = {}
         
         for strip_id, strip in self.strips.items():
+            if strip.coordinates is None:
+                continue
+                
             # Calculate distances from center to each LED in the strip
-            distances = np.linalg.norm(strip.positions - center_array, axis=1)
+            distances = np.linalg.norm(strip.coordinates - center_array, axis=1)
             
             # If any LED is within radius, include this strip
             if np.any(distances <= radius):
@@ -111,7 +168,6 @@ class StripManager:
     def _invalidate_caches(self) -> None:
         """Clear caches when strips are modified"""
         self._groups_cache.clear()
-        self._themes_cache.clear()
     
     def create_buffers(self) -> Dict[str, np.ndarray]:
         """Create a buffer dictionary with arrays for each strip (for rendering)"""
@@ -119,8 +175,6 @@ class StripManager:
             strip_id: np.zeros((strip.length, 4), dtype=np.float32)  # RGBA
             for strip_id, strip in self.strips.items()
         }
-
-# Add this method to the StripManager class
 
     def create_dmx_senders(self) -> Dict[str, Any]:
         """Create DMX senders for each unique IP address in strip metadata"""
@@ -176,6 +230,7 @@ class StripManager:
             except Exception as e:
                 print(f"Error sending DMX data to {ip}: {e}")
 
+
 class StripLoader:
     """Utilities for loading strip definitions from files"""
     
@@ -211,27 +266,21 @@ class StripLoader:
         # Extract required fields
         strip_id = data['id']
         length = data['length']
-        # Handle positions - could be inline or reference a file
-        positions = data.get('positions')
-        if isinstance(positions, str) and os.path.exists(positions):
-            # Load positions from file (CSV, NPY, etc.)
-            if positions.endswith('.npy'):
-                positions = np.load(positions)
-            elif positions.endswith('.csv'):
-                positions = np.loadtxt(positions, delimiter=',')
-            else:
-                raise ValueError(f"Unsupported position file format: {positions}")
-        else:
-            # Convert from JSON array to numpy array
-            positions = np.array(positions)
+        strip_type = data.get('type', 'line')  # Default to line if type not specified
+        
+        # Get position data
+        position_data = data.get('position', {})
         
         # Create the strip with other metadata
         return LEDStrip(
             id=strip_id,
             length=length,
+            type=strip_type,
             groups=data.get('groups', []),
+            position_data=position_data,
             metadata=data.get('metadata', {})
         )
+
 
 class BufferManager:
     """Manages multiple output buffers for different graphic generators"""
@@ -247,12 +296,9 @@ class BufferManager:
         
         Args:
             generator_name: Name of the generator
-            alpha: Global alpha value for this generator (0.0 - 1.0)
         """
         # Skip if generator already exists
         if generator_name in self.generators:
-            # Update alpha value if generator exists
-            #self.generator_alphas[generator_name] = alpha
             return
             
         # Create buffers for this generator (one per strip)
@@ -263,7 +309,6 @@ class BufferManager:
         
         # Store alpha value for this generator
         self.generator_alphas[generator_name] = 1
-    
     
     def get_buffer(self, generator_name: str, strip_id: str) -> np.ndarray:
         """Get a specific buffer for a generator and strip"""
@@ -361,16 +406,10 @@ class BufferManager:
                     else:
                         np.maximum(target_buffer, source_buffer, out=target_buffer)
 
-strip_manager = StripLoader.from_json("C:\\Users\\diete\\Desktop\\devel-local\\Out The Other\\OTO\\strips.json")
-buffer_manager = BufferManager(strip_manager)
 
-# Register different graphic generators
-buffer_manager.register_generator("rainbow")
-buffer_manager.register_generator("sparkle") 
-buffer_manager.register_generator("wave")
-output_buffers = strip_manager.create_buffers()
+# Helper functions for testing
 def hsv_to_rgb(h, s, v):
-    # Simple HSV to RGB conversion
+    """Simple HSV to RGB conversion"""
     h_i = int(h * 6)
     f = h * 6 - h_i
     p = v * (1 - s)
@@ -389,7 +428,9 @@ def hsv_to_rgb(h, s, v):
         return t, p, v
     else:
         return v, p, q
+
 def generate_rainbow(buffers):
+    """Generate a rainbow pattern in the buffers"""
     for strip_id, buffer in buffers.items():
         # Fill buffer with rainbow pattern
         for i in range(len(buffer)):
@@ -397,7 +438,3 @@ def generate_rainbow(buffers):
             # Convert HSV to RGB
             r, g, b = hsv_to_rgb(hue, 1.0, 1.0)
             buffer[i] = [r, g, b, 1.0]  # Full opacity
-
-generate_rainbow(buffer_manager.get_all_buffers("rainbow"))
-
-buffer_manager.merge_buffers(output_buffers, blend_mode='alpha')

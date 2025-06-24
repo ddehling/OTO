@@ -4,35 +4,50 @@
       "id": "left_ear_1",
       "length": 150,
       "groups": ["ceiling", "perimeter"],
+      "type": "line",
+      "position": {
+        "start": [0.0, 0.0, 0.0],
+        "end": [5.0, 0.0, 0.0]
+      },
       "metadata": {
         "Strip_usaage": "Secondary",      
-        "REC_IP":"192.168.68.111",
-      "Strip_num":0,
-      "Direction":1
+        "REC_IP": "192.168.68.111",
+        "Strip_num": 0,
+        "Direction": 1
       }
     },
     {
       "id": "left_ear_2",
       "length": 200,
       "groups": ["walls", "perimeter", "east"],
-
+      "type": "circle",
+      "position": {
+        "center": [0.0, 2.0, 0.0],
+        "radius": 3.0,
+        "normal": [0.0, 0.0, 1.0],
+        "start_angle": 0.0
+      },
       "metadata": {
         "Strip_usaage": "Primary",
-        "REC_IP":"192.168.68.111",
-      "Strip_num":1,
-      "Direction":-1
+        "REC_IP": "192.168.68.111",
+        "Strip_num": 1,
+        "Direction": -1
       }
     },
-        {
+    {
       "id": "left_ear_0",
       "length": 500,
       "groups": ["walls", "perimeter", "east"],
-
+      "type": "line",
+      "position": {
+        "start": [-50.0, 0.0, -2.0],
+        "end": [5.0, 0.0, -2.0]
+      },
       "metadata": {
         "Strip_usaage": "Secondary",
-      "REC_IP":"192.168.68.112",
-      "Strip_num":0,
-      "Direction":1
+        "REC_IP": "192.168.68.112",
+        "Strip_num": 0,
+        "Direction": 1
       }
     }
   ]
