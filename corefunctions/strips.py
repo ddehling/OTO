@@ -13,7 +13,7 @@ class LEDStrip:
     # Basic properties
     id: str                           # Unique identifier for the strip
     length: int                       # Number of LEDs in strip
-    type: Literal["line", "circle"]   # Type of strip (line or circle)
+    type: Literal["line", "circle", "arc"]   # Type of strip (line, circle, or arc)
     groups: List[str] = field(default_factory=list)  # All groups this strip belongs to
 
     # Physical properties
@@ -46,6 +46,8 @@ class LEDStrip:
             self._generate_line_coordinates()
         elif self.type == "circle":
             self._generate_circle_coordinates()
+        elif self.type == "arc":
+            self._generate_arc_coordinates()
         else:
             raise ValueError(f"Unsupported strip type: {self.type}")
     
@@ -99,7 +101,99 @@ class LEDStrip:
             angle = start_angle + (i / self.length) * 2 * np.pi
             point = center + radius * (perp1 * np.cos(angle) + perp2 * np.sin(angle))
             self.coordinates[i] = point
-
+    
+    def _generate_arc_coordinates(self):
+        """Generate coordinates for an arc strip"""
+        if ("start" not in self.position_data or 
+            "end" not in self.position_data or 
+            "arc_degrees" not in self.position_data):
+            # Create default coordinates if position data not provided
+            self.coordinates = np.zeros((self.length, 3))
+            return
+            
+        start = np.array(self.position_data["start"])
+        end = np.array(self.position_data["end"])
+        arc_degrees = self.position_data["arc_degrees"]
+        normal = np.array(self.position_data.get("normal", [0, 1, 0]))
+        
+        # Normalize the normal vector
+        normal = normal / np.linalg.norm(normal)
+        
+        # Calculate arc parameters
+        chord = end - start
+        chord_length = np.linalg.norm(chord)
+        
+        # Convert arc degrees to radians
+        arc_radians = math.radians(arc_degrees)
+        
+        # Calculate the radius of the arc
+        # For a circular arc: chord_length = 2 * radius * sin(arc_angle/2)
+        radius = chord_length / (2 * math.sin(arc_radians / 2)) if arc_radians != 0 else float('inf')
+        
+        # Find the center of the arc
+        # The center is at a distance 'h' from the midpoint of the chord
+        # where h = radius * cos(arc_angle/2)
+        midpoint = (start + end) / 2
+        
+        # Direction from midpoint to center is perpendicular to chord and in plane defined by normal
+        chord_normalized = chord / chord_length
+        
+        # Direction vector perpendicular to both chord and normal
+        perp_dir = np.cross(normal, chord_normalized)
+        perp_dir = perp_dir / np.linalg.norm(perp_dir)
+        
+        # Direction from midpoint to center (perpendicular to chord, in plane)
+        center_dir = np.cross(chord_normalized, perp_dir)
+        center_dir = center_dir / np.linalg.norm(center_dir)
+        
+        # Distance from midpoint to center
+        h = radius * math.cos(arc_radians / 2)
+        
+        # If arc_degrees > 180, flip the center direction
+        if arc_degrees > 180:
+            h = -h
+            
+        # Calculate center
+        center = midpoint + h * center_dir
+        
+        # Calculate start angle and sweep angle
+        # Vector from center to start point
+        vec_to_start = start - center
+        vec_to_start = vec_to_start / np.linalg.norm(vec_to_start)
+        
+        # Find perpendicular vectors to define the arc plane
+        # First perpendicular vector is the normalized vector to start
+        perp1 = vec_to_start
+        
+        # Second perpendicular vector (cross product of normal and perp1)
+        perp2 = np.cross(normal, perp1)
+        perp2 = perp2 / np.linalg.norm(perp2)
+        
+        # The sweep direction should be from start to end
+        # Calculate the sign of the sweep by checking which side of the plane the end point is on
+        vec_to_end = end - center
+        vec_to_end = vec_to_end / np.linalg.norm(vec_to_end)
+        
+        # Dot product with perp2 to determine direction
+        dot_product = np.dot(vec_to_end, perp2)
+        sweep_sign = -1 if dot_product < 0 else 1
+        
+        # Generate points along the arc
+        self.coordinates = np.zeros((self.length, 3))
+        
+        # Start angle is 0 (vec_to_start is already our x-axis equivalent)
+        start_angle = 0
+        
+        # Calculate the total sweep angle
+        sweep_angle = sweep_sign * arc_radians
+        
+        for i in range(self.length):
+            t = i / (self.length - 1) if self.length > 1 else 0
+            angle = start_angle + t * sweep_angle
+            
+            # Calculate point position using parametric equation of circle
+            point = center + radius * (perp1 * math.cos(angle) + perp2 * math.sin(angle))
+            self.coordinates[i] = point
 
 class StripManager:
     """Manages a collection of LED strips with query capabilities"""

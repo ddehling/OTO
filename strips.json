@@ -49,6 +49,24 @@
         "Strip_num": 0,
         "Direction": 1
       }
+    },
+    {
+    "id": "arc_strip_1",
+    "length": 100,
+    "groups": ["ceiling", "perimeter"],
+    "type": "arc",
+    "position": {
+      "start": [0.0, 0.0, 0.0],
+      "end": [5.0, 0.0, 0.0],
+      "arc_degrees": 90,
+      "normal": [0.0, 1.0, 0.0]
+    },
+    "metadata": {
+      "Strip_usage": "Primary",
+      "REC_IP": "192.168.68.111",
+      "Strip_num": 2,
+      "Direction": 1
     }
+  }
   ]
 }

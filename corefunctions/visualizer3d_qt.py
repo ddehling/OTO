@@ -154,7 +154,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
     def initializeGL(self):
         """Initialize OpenGL settings"""
         # Set clear color (background)
-        glClearColor(0.1, 0.1, 0.1, 1.0)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
         
         # Enable depth testing
         glEnable(GL_DEPTH_TEST)
