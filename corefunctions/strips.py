@@ -119,82 +119,91 @@ class LEDStrip:
         # Normalize the normal vector
         normal = normal / np.linalg.norm(normal)
         
-        # Calculate arc parameters
+        # Handle special case: if arc_degrees is close to 0 or 180, special handling
+        if abs(arc_degrees) < 0.001:
+            # Generate a straight line
+            self.coordinates = np.zeros((self.length, 3))
+            for i in range(self.length):
+                t = i / (self.length - 1) if self.length > 1 else 0
+                self.coordinates[i] = start + t * (end - start)
+            return
+        
+        # Calculate chord and midpoint
         chord = end - start
         chord_length = np.linalg.norm(chord)
-        
-        # Convert arc degrees to radians
-        arc_radians = math.radians(arc_degrees)
-        
-        # Calculate the radius of the arc
-        # For a circular arc: chord_length = 2 * radius * sin(arc_angle/2)
-        radius = chord_length / (2 * math.sin(arc_radians / 2)) if arc_radians != 0 else float('inf')
-        
-        # Find the center of the arc
-        # The center is at a distance 'h' from the midpoint of the chord
-        # where h = radius * cos(arc_angle/2)
         midpoint = (start + end) / 2
         
-        # Direction from midpoint to center is perpendicular to chord and in plane defined by normal
-        chord_normalized = chord / chord_length
+        # We need a direction perpendicular to the chord in the plane of the arc
+        # This will be the direction along which the center lies
         
-        # Direction vector perpendicular to both chord and normal
-        perp_dir = np.cross(normal, chord_normalized)
-        perp_dir = perp_dir / np.linalg.norm(perp_dir)
+        # First, normalize the chord direction
+        chord_unit = chord / chord_length if chord_length > 0 else np.array([1.0, 0.0, 0.0])
         
-        # Direction from midpoint to center (perpendicular to chord, in plane)
-        center_dir = np.cross(chord_normalized, perp_dir)
-        center_dir = center_dir / np.linalg.norm(center_dir)
+        # The perpendicular direction is cross product of normal and chord_unit
+        bisector_dir = np.cross(normal, chord_unit)
+        bisector_dir = bisector_dir / np.linalg.norm(bisector_dir)
         
-        # Distance from midpoint to center
-        h = radius * math.cos(arc_radians / 2)
+        # Convert arc angle to radians
+        arc_radians = math.radians(abs(arc_degrees))
         
-        # If arc_degrees > 180, flip the center direction
-        if arc_degrees > 180:
+        # Calculate radius using the chord length and arc angle
+        # For a circular arc: chord_length = 2 * radius * sin(arc_angle/2)
+        radius = chord_length / (2 * math.sin(arc_radians / 2)) if abs(math.sin(arc_radians / 2)) > 1e-10 else 1e10
+        
+        # Calculate the distance from midpoint to center along the bisector
+        # Using: radius^2 = (chord/2)^2 + h^2, where h is the distance
+        h = math.sqrt(max(0, radius**2 - (chord_length/2)**2))
+        
+        # The sign of h depends on the arc angle and direction
+        # For arc > 180 degrees, center is on the opposite side of the chord
+        if abs(arc_degrees) > 180:
             h = -h
             
-        # Calculate center
-        center = midpoint + h * center_dir
+        # For negative arc angle, we go in the opposite direction
+        if arc_degrees < 0:
+            bisector_dir = -bisector_dir
         
-        # Calculate start angle and sweep angle
-        # Vector from center to start point
-        vec_to_start = start - center
-        vec_to_start = vec_to_start / np.linalg.norm(vec_to_start)
+        # Calculate the center
+        center = midpoint + h * bisector_dir
         
-        # Find perpendicular vectors to define the arc plane
-        # First perpendicular vector is the normalized vector to start
-        perp1 = vec_to_start
-        
-        # Second perpendicular vector (cross product of normal and perp1)
-        perp2 = np.cross(normal, perp1)
-        perp2 = perp2 / np.linalg.norm(perp2)
-        
-        # The sweep direction should be from start to end
-        # Calculate the sign of the sweep by checking which side of the plane the end point is on
-        vec_to_end = end - center
-        vec_to_end = vec_to_end / np.linalg.norm(vec_to_end)
-        
-        # Dot product with perp2 to determine direction
-        dot_product = np.dot(vec_to_end, perp2)
-        sweep_sign = -1 if dot_product < 0 else 1
-        
-        # Generate points along the arc
+        # Initialize coordinates array
         self.coordinates = np.zeros((self.length, 3))
         
-        # Start angle is 0 (vec_to_start is already our x-axis equivalent)
-        start_angle = 0
+        # Calculate vectors from center to start and end for verification
+        vec_to_start = start - center
+        vec_to_end = end - center
+        
+        # Use the actual radius (distance from center to points)
+        radius_actual = np.linalg.norm(vec_to_start)
+        
+        # Create a basis in the plane for the circle
+        # First basis vector is the normalized vector from center to start
+        basis1 = vec_to_start / radius_actual
+        
+        # Second basis vector is perpendicular to both normal and basis1
+        basis2 = np.cross(normal, basis1)
+        basis2 = basis2 / np.linalg.norm(basis2)
         
         # Calculate the total sweep angle
-        sweep_angle = sweep_sign * arc_radians
+        total_sweep = arc_radians
         
+        # Generate all points along the arc
         for i in range(self.length):
+            # Calculate the angle for this point (0 at start, arc_radians at end)
             t = i / (self.length - 1) if self.length > 1 else 0
-            angle = start_angle + t * sweep_angle
+            angle = t * total_sweep
             
-            # Calculate point position using parametric equation of circle
-            point = center + radius * (perp1 * math.cos(angle) + perp2 * math.sin(angle))
+            # For negative arc_degrees, we go clockwise instead of counterclockwise
+            if arc_degrees < 0:
+                angle = -angle
+                
+            # Calculate the point using parametric equation of a circle
+            x = math.cos(angle)
+            y = math.sin(angle)
+            
+            # Combine the basis vectors to get the point
+            point = center + radius_actual * (basis1 * x + basis2 * y)
             self.coordinates[i] = point
-
 class StripManager:
     """Manages a collection of LED strips with query capabilities"""
     
