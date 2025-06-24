@@ -99,7 +99,7 @@ if __name__ == "__main__":
             #time.sleep(sleep_time)
 
             # Print stats if needed
-            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            #print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
             lasttime = time.perf_counter()
 
     except KeyboardInterrupt:
