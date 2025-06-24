@@ -170,3 +170,5 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+*.pyc
+corefunctions/__pycache__/Events.cpython-312.pyc

@@ -205,8 +205,8 @@ class EventScheduler:
 
         
         # Update the visualizer if enabled
-        # if self.state['visualize'] and self.visualizer is not None:
-        #     self.visualizer.update(self.state['output'])
+        if self.state['visualize'] and self.visualizer is not None:
+            self.visualizer.update(self.state['output'])
         # Render all frames
         # frames = []
         # for scene in self.state['render']:
