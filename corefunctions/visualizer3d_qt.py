@@ -37,7 +37,7 @@ class LED3DVisualizer(QMainWindow):
         
         # Initialize UI
         self.setWindowTitle("3D LED Strip Visualizer")
-        self.setGeometry(100, 100, width, height)
+        self.setGeometry(300, 300, width, height)
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -113,7 +113,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         self.strip_colors = {}
         
         # Camera settings
-        self.camera_distance = 15.0
+        self.camera_distance = 150.0
         self.camera_elevation = 30.0  # degrees
         self.camera_azimuth = 0.0     # degrees
         self.camera_target = [0.0, 0.0, 0.0]  # Look at center
@@ -184,7 +184,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
         # Set up the projection matrix
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(45, width / height, 0.1, 100.0)
+        gluPerspective(45, width / height, 0.1, 500.0)
         
         # Return to model view matrix
         glMatrixMode(GL_MODELVIEW)
@@ -302,7 +302,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
                 for i, pos in enumerate(strip.coordinates):
                     if i < len(colors):
                         color = colors[i]
-                        self._draw_led_sphere(pos, 0.05, color)
+                        self._draw_led_sphere(pos, 0.35, color)
             
             # Draw strip ID using billboard technique (facing camera)
             if len(strip.coordinates) > 0:
@@ -457,7 +457,7 @@ class LED3DOpenGLWidget(QOpenGLWidget):
             self.camera_distance *= zoom_factor
         
         # Clamp distance to reasonable values
-        self.camera_distance = max(2.0, min(50.0, self.camera_distance))
+        self.camera_distance = max(1.0, min(150.0, self.camera_distance))
         
         self.update()
     

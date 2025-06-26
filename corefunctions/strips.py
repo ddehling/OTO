@@ -503,8 +503,9 @@ class BufferManager:
         self.strip_manager = strip_manager
         self.generators = {}  # Dictionary to store generator names and their buffers
         self.generator_alphas = {}
+        self.generator_priorities = {}
 
-    def register_generator(self, generator_name: str) -> None:
+    def register_generator(self, generator_name: str, priority: int = 0) -> None:
         """
         Register a new graphic generator and create its buffers
         
@@ -513,6 +514,8 @@ class BufferManager:
         """
         # Skip if generator already exists
         if generator_name in self.generators:
+            # Update priority if generator already exists
+            self.generator_priorities[generator_name] = priority
             return
             
         # Create buffers for this generator (one per strip)
@@ -523,7 +526,8 @@ class BufferManager:
         
         # Store alpha value for this generator
         self.generator_alphas[generator_name] = 1
-    
+        self.generator_priorities[generator_name] = priority
+
     def get_buffer(self, generator_name: str, strip_id: str) -> np.ndarray:
         """Get a specific buffer for a generator and strip"""
         if generator_name not in self.generators:
@@ -570,9 +574,16 @@ class BufferManager:
                 
             # Clear the output buffer
             output_buffers[strip_id].fill(0)
+
+            # Sort generators by priority (lower to higher)
+            sorted_generators = sorted(
+                self.generators.items(), 
+                key=lambda x: self.generator_priorities.get(x[0], 0)
+            )
             
+
             # For each generator, blend its buffer into the output
-            for generator_name, gen_buffers in self.generators.items():
+            for generator_name, gen_buffers in sorted_generators:
                 # Skip generators with zero alpha
                 generator_alpha = self.generator_alphas.get(generator_name, 1.0)
                 if generator_alpha <= 0.0:

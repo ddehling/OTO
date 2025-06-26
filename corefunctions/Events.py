@@ -77,7 +77,8 @@ class EventScheduler:
         
         # Define dimensions for multiple frames
         self.strip_manager = StripLoader.from_json("C:\\Users\\diete\\Desktop\\devel-local\\Out The Other\\OTO\\strips.json")  # noqa: F405
-        self.strip_manager.concatenate_strips("left_wall", ["left_ear_0", "left_ear_1", "left_ear_2"])
+        #self.strip_manager.concatenate_strips("left_wall", ["left_ear_0", "left_ear_1", "left_ear_2"])
+        self.state['strip_manager'] = self.strip_manager
         self.state['buffers'] = BufferManager(self.strip_manager)# noqa: F405
         self.state['output']=self.strip_manager.create_buffers()
         self.state['last_time'] = time.time()
