@@ -2,7 +2,7 @@ import numpy as np
 import time
 from corefunctions.Events import EventScheduler
 from sceneutils.OTO_dev import *  # noqa: F403
-from input_panel import InputPanel 
+from corefunctions.input_panel import InputPanel 
  # noqa: F403
 #
 class EnvironmentalSystem:
@@ -157,8 +157,9 @@ if __name__ == "__main__":
     scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
-    env_system.scheduler.schedule_event(0, 240, OTO_heartbeat)
-    #env_system.scheduler.schedule_event(00, 40, OTO_blink)  # noqa: F405
+    #env_system.scheduler.schedule_event(0, 240, OTO_heartbeat)# noqa: F405
+    #env_system.scheduler.schedule_event(00, 80, OTO_blink)  # noqa: F405
+    env_system.scheduler.schedule_event(00, 80, OTO_point_traveler)
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()

@@ -72,31 +72,15 @@
       }
     },
     {
-      "id": "spine",
-      "length": 200,
-      "groups": ["walls", "perimeter", "east"],
-      "type": "line",
-      "position": {
-        "start": [0, 0.0, 0],
-        "end": [0.0, 0.0,-100.0]
-      },
-      "metadata": {
-        "Strip_usaage": "Secondary",
-        "REC_IP": "192.168.68.112",
-        "Strip_num": 0,
-        "Direction": 1
-      }
-    },
-    {
     "id": "arc_strip_1",
-    "length": 10,
-    "groups": ["ceiling", "perimeter"],
+    "length": 30,
+    "groups": ["spine", "left"],
     "type": "arc",
     "position": {
-      "start": [0.0, 0.0, 3.0],
-      "end": [5.0, 0.0, 3.0],
-      "arc_degrees": 140,
-      "normal": [0.0, 1.0, 0.0]
+      "start": [0.0, 10.0, 0.0],
+      "end": [0.0, 3.0, -7.0],
+      "arc_degrees": -90,
+      "normal": [-1.0, 0.0, 0.0]
     },
     "metadata": {
       "Strip_usage": "Primary",
@@ -106,15 +90,31 @@
     }
   },
     {
+      "id": "spine_1",
+      "length": 200,
+      "groups": ["spine", "left", "east"],
+      "type": "line",
+      "position": {
+        "start": [0.0, 3.0, -7.5],
+        "end": [0.0, 3.0,-100.0]
+      },
+      "metadata": {
+        "Strip_usaage": "Secondary",
+        "REC_IP": "192.168.68.112",
+        "Strip_num": 0,
+        "Direction": 1
+      }
+    },
+    {
     "id": "arc_strip_2",
-    "length": 10,
-    "groups": ["ceiling", "perimeter"],
+    "length": 30,
+    "groups": ["spine", "right"],
     "type": "arc",
     "position": {
-      "start": [5.0, 0.0, 3.0],
-      "end": [5.0, 4.0, -3.0],
-      "arc_degrees": 40,
-      "normal": [0.0, 1.0, 1.0]
+      "start": [0.0, -10.0, 0.0],
+      "end": [0.0, -3.0, -7.0],
+      "arc_degrees": -90,
+      "normal": [1.0, 0.0, 0.0]
     },
     "metadata": {
       "Strip_usage": "Primary",
@@ -122,7 +122,24 @@
       "Strip_num": 2,
       "Direction": 1
     }
-  } ,   {
+  },
+    {
+      "id": "spine_2",
+      "length": 200,
+      "groups": ["spine", "right", "east"],
+      "type": "line",
+      "position": {
+        "start": [0.0, -3.0, -7.5],
+        "end": [0.0, -3.0,-100.0]
+      },
+      "metadata": {
+        "Strip_usaage": "Secondary",
+        "REC_IP": "192.168.68.112",
+        "Strip_num": 0,
+        "Direction": 1
+      }
+    }
+     ,   {
       "id": "heart_1",
       "length": 60,
       "groups": ["heart", "right","circle"],
@@ -157,6 +174,78 @@
         "Strip_num": 1,
         "Direction": -1
       }
+    },
+    {
+      "id": "heart_3",
+      "length": 40,
+      "groups": ["heart", "left","circle"],
+      "type": "circle",
+      "position": {
+        "center": [0.0, 0.0, -50.0],
+        "radius": 5.0,
+        "normal": [1.0, -1.0, 1.0],
+        "start_angle": 0.0
+      },
+      "metadata": {
+        "Strip_usaage": "Primary",
+        "REC_IP": "192.168.68.111",
+        "Strip_num": 1,
+        "Direction": -1
+      }
+    },
+    {
+    "id": "stair_arc_1",
+    "length": 300,
+    "groups": ["base", "perimeter"],
+    "type": "arc",
+    "position": {
+      "start": [0.0, -20.0, -80.0],
+      "end": [0.0, 20.0, -80.0],
+      "arc_degrees": -270,
+      "normal": [0.0, 0.0, 1.0]
+    },
+    "metadata": {
+      "Strip_usage": "Primary",
+      "REC_IP": "192.168.68.111",
+      "Strip_num": 2,
+      "Direction": 1
     }
+  },
+    {
+    "id": "stair_arc_2",
+    "length": 400,
+    "groups": ["base", "perimeter"],
+    "type": "arc",
+    "position": {
+      "start": [0.0, -30.0, -90.0],
+      "end": [0.0, 30.0, -90.0],
+      "arc_degrees": -270,
+      "normal": [0.0, 0.0, 1.0]
+    },
+    "metadata": {
+      "Strip_usage": "Primary",
+      "REC_IP": "192.168.68.111",
+      "Strip_num": 2,
+      "Direction": 1
+    }
+  },
+    {
+    "id": "stair_arc_3",
+    "length": 500,
+    "groups": ["base", "perimeter"],
+    "type": "arc",
+    "position": {
+      "start": [0.0, -40.0, -100.0],
+      "end": [0.0, 40.0, -100.0],
+      "arc_degrees": -270,
+      "normal": [0.0, 0.0, 1.0]
+    },
+    "metadata": {
+      "Strip_usage": "Primary",
+      "REC_IP": "192.168.68.111",
+      "Strip_num": 2,
+      "Direction": 1
+    }
+  }
   ]
 }

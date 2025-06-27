@@ -1,9 +1,7 @@
 import time
 import heapq
 import numpy as np
-import cv2  # noqa: F401
 from corefunctions.visualizer3d_qt import create_strip_visualizer
-
 import corefunctions.ImageToDMX as imdmx  # noqa: F401
 from corefunctions.strips import *  # noqa: F403
 from pythonosc.osc_server import ThreadingOSCUDPServer
@@ -76,8 +74,9 @@ class EventScheduler:
         self.state = {}
         
         # Define dimensions for multiple frames
-        self.strip_manager = StripLoader.from_json("C:\\Users\\diete\\Desktop\\devel-local\\Out The Other\\OTO\\strips.json")  # noqa: F405
-        #self.strip_manager.concatenate_strips("left_wall", ["left_ear_0", "left_ear_1", "left_ear_2"])
+        self.strip_manager = StripLoader.from_json("strips.json")  # noqa: F405
+        self.strip_manager.concatenate_strips("left_spine", ["arc_strip_1", "spine_1"])
+        self.strip_manager.concatenate_strips("right_spine", ["arc_strip_2", "spine_2"])
         self.state['strip_manager'] = self.strip_manager
         self.state['buffers'] = BufferManager(self.strip_manager)# noqa: F405
         self.state['output']=self.strip_manager.create_buffers()

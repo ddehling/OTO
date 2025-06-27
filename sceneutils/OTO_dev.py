@@ -1,6 +1,5 @@
 import time
 import numpy as np
-from skimage import color
 from pathlib import Path
 
 ParentPath = Path(__file__).parent.parent
@@ -189,8 +188,8 @@ def OTO_point_traveler(instate, outstate):
         buffer[:, 3] *= fade_factor
     
     # Focus on the left_wall strip
-    if 'left_wall' in all_buffers:
-        buffer = all_buffers['left_wall']
+    if 'right_spine' in all_buffers:
+        buffer = all_buffers['right_spine']
         strip_length = len(buffer)
         
         # Set the current position to the current color
@@ -281,12 +280,12 @@ def OTO_heartbeat(instate, outstate):
         instate['peak_color'] = peak_color
     
     # Check if heart rate should be updated from external conditions
-    if 'control_intensity' in outstate:
-        instate['heart_rate'] = outstate['control_intensity']
+    if 'control_speed' in outstate:
+        instate['heart_rate'] = outstate['control_speed']
     
     # Check if strength should be updated from external conditions
-    if 'heart_strength' in outstate:
-        instate['strength'] = outstate['heart_strength']
+    if 'control_intensity' in outstate:
+        instate['strength'] = outstate['control_intensity']/100.0
     
     # Process each buffer
     for strip_id, buffer in all_buffers.items():
