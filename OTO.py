@@ -22,7 +22,7 @@ class EnvironmentalSystem:
         self.smoothed_values = self.input_values.copy()
         
         # Set smoothing factor (0-1, lower values mean more smoothing)
-        self.smoothing_factor = 0.01
+        self.smoothing_factor = 0.003
         
         # Track last update time for consistent smoothing
         self.last_update_time = time.time()
@@ -42,30 +42,6 @@ class EnvironmentalSystem:
         """Return the current control values from the input panel"""
         return self.input_panel.get_values()
 
-    def transition_update(self):
-        yo=1
-        # self.progress = 1.0
-        # if self.current_weather != self.target_weather:
-        #     self.progress = min(
-        #         1.0, (self.current_time - self.transition_start) / self.transition_time
-        #     )
-
-        #     start_params = self.get_weather_params(self.current_weather)
-        #     target_params = self.get_weather_params(self.target_weather)
-
-        #     # Interpolate parameters
-        #     for param in target_params:
-        #         if isinstance(target_params[param], (int, float, np.ndarray)):
-        #             self.weather_params[param] = (
-        #                 target_params[param] - start_params[param]
-        #             ) * self.progress + start_params[param]
-        #         else:
-        #             # For non-numeric parameters, just use the target value
-        #             self.weather_params[param] = target_params[param]
-
-        #     if self.progress >= 1.0:
-        #         self.current_weather = self.target_weather
-        #         self.weather_params = target_params.copy()
 
     def send_variables(self):
         """Send variables to scheduler with exponential smoothing"""
@@ -85,32 +61,32 @@ class EnvironmentalSystem:
         
         # Apply exponential smoothing and send to scheduler
         for key, raw_value in raw_values.items():
+            # Handle actual selected_mode and selected_effect without smoothing
             if key in ['selected_mode', 'selected_effect']:
-                # For discrete values like selections, we don't smooth
-                smooth_value = raw_value
+                self.smoothed_values[key] = raw_value
+                self.scheduler.state[f"control_{key}"] = raw_value
+                
+                continue
+                
+            # For all numeric values (including mode_X and effect_X values), apply smoothing
+            if key in self.smoothed_values:
+                current_smooth = self.smoothed_values[key]
+                smooth_value = current_smooth + frame_smoothing * (raw_value - current_smooth)
                 self.smoothed_values[key] = smooth_value
             else:
-                # For continuous values, apply exponential smoothing
-                if key in self.smoothed_values:
-                    current_smooth = self.smoothed_values[key]
-                    smooth_value = current_smooth + frame_smoothing * (raw_value - current_smooth)
-                    self.smoothed_values[key] = smooth_value
-                else:
-                    # Initialize if not exists
-                    smooth_value = raw_value
-                    self.smoothed_values[key] = smooth_value
+                # Initialize if not exists
+                smooth_value = raw_value
+                self.smoothed_values[key] = smooth_value
             
             # Store smoothed value in scheduler state
             if isinstance(smooth_value, (int, float)) and not isinstance(smooth_value, bool):
-                self.scheduler.state[f"control_{key}"] = round(smooth_value, 2)
+                self.scheduler.state[f"control_{key}"] = round(smooth_value, 3)
             else:
                 self.scheduler.state[f"control_{key}"] = smooth_value
-
             
-    def random_events(self):
-        randcheck = np.random.random()
 
-    def get_control_values(self):
+
+    def get_control_values(self):  # noqa: F811
         """Return the current raw control values from the input panel"""
         return self.input_panel.get_values()
     
@@ -133,18 +109,9 @@ class EnvironmentalSystem:
         if messages != []:
             print(messages)  # Eventually want to pass these to the scheduler
             
-        # Handle transitions
-        self.transition_update()
-
-        # Update celestial bodies
-
-            
         # Apply current parameters to scheduler state
         self.send_variables()
         
-        # Random events
-        self.random_events()
-
         
         # Update the scheduler
         self.scheduler.update()
@@ -159,7 +126,7 @@ if __name__ == "__main__":
    
     #env_system.scheduler.schedule_event(0, 240, OTO_heartbeat)# noqa: F405
     #env_system.scheduler.schedule_event(00, 80, OTO_blink)  # noqa: F405
-    env_system.scheduler.schedule_event(00, 80, OTO_point_traveler)
+    env_system.scheduler.schedule_event(00, 8000000, OTO_waiting) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()

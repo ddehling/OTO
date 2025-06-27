@@ -1,4 +1,4 @@
-import time
+
 import numpy as np
 from pathlib import Path
 
@@ -368,3 +368,187 @@ def OTO_heartbeat(instate, outstate):
             
             # Apply the color to all pixels in the strip
             buffer[:] = [r, g, b, a]
+
+def OTO_waiting(instate, outstate):
+    """
+    Generator function for a waiting state that creates moving points with fading trails
+    along different strip types based on their groups.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_waiting'] value
+    2. Color set by outstate['control_hue'] key (single hue value)
+    3. For spine strips: 10 spots moving downward with random speed variations
+    4. For base strips: 10 spots (5 up, 5 down) that fade when reaching center
+    5. For ear (circular) strips: Points moving in circular patterns
+    """
+    name = 'waiting'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize spots for different strip types
+        instate['spots'] = {}
+        
+        # Get all strip IDs
+        strip_ids = list(buffers.get_all_buffers(name).keys())
+        
+        for strip_id in strip_ids:
+            # Skip if strip doesn't exist in manager
+            if strip_id not in strip_manager.strips:
+                continue
+                
+            strip = strip_manager.get_strip(strip_id)
+            strip_length = strip.length
+            
+            # Initialize spots based on strip type/group
+            if strip_id in ['left_spine', 'right_spine']:
+                # 10 spots moving down the spine
+                instate['spots'][strip_id] = [
+                    {
+                        'pos': np.random.randint(0, strip_length),
+                        'speed_factor': 0.8 + np.random.random() * 0.4,  # Random speed variation
+                        'alpha': 1.0
+                    } for _ in range(10)
+                ]
+            elif 'base' in strip.groups:
+                # 5 spots moving upward, 5 moving downward
+                spots = []
+                for i in range(5):
+                    # Upward moving spots
+                    spots.append({
+                        'pos': np.random.randint(0, strip_length // 2),
+                        'speed_factor': 0.8 + np.random.random() * 0.4,
+                        'direction': 1,  # Moving upward (increasing index)
+                        'alpha': 1.0
+                    })
+                    # Downward moving spots
+                    spots.append({
+                        'pos': np.random.randint(strip_length // 2, strip_length),
+                        'speed_factor': 0.8 + np.random.random() * 0.4,
+                        'direction': -1,  # Moving downward (decreasing index)
+                        'alpha': 1.0
+                    })
+                instate['spots'][strip_id] = spots
+            elif 'ear' in strip.groups:# or strip.type == "circle":
+                # Circular movement - 3 spots per ear
+                instate['spots'][strip_id] = [
+                    {
+                        'pos': np.random.randint(0, strip_length),
+                        'speed_factor': 0.8 + np.random.random() * 0.4,
+                        'alpha': 1.0
+                    } for _ in range(3)
+                ]
+        return
+
+    if instate['count'] == -1:
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get waiting level from outstate or default to 0
+    waiting_level = outstate.get('control_mode_waiting', 1)
+    
+    # Set generator alpha based on waiting level
+    if waiting_level > 0.05:
+        buffers.generator_alphas[name] = waiting_level
+    else:
+        buffers.generator_alphas[name] = 0
+        return  # Skip further processing if not visible
+
+    # Get base speed from outstate or use default
+    base_speed = outstate.get('control_speed', 5.0)  # Default 5 pixels per second
+    
+    # Get hue from outstate or use default (magenta)
+    hue = outstate.get('control_hue', 50)/100.0  # Default hue=0.8 (magenta/purple)
+    
+    # Fixed saturation and value for vibrant colors
+    saturation = 1.0
+    value = 1.0
+    
+    # Time delta for movement calculation
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Get all strip buffers for our generator
+    all_buffers = buffers.get_all_buffers(name)
+    
+    # Process each buffer
+    for strip_id, buffer in all_buffers.items():
+        # Skip if we don't have spots for this strip
+        if strip_id not in instate['spots']:
+            continue
+        
+        # Fade existing pixels (create trail effect)
+        fade_factor = 0.85  # 15% reduction per frame
+        buffer[:, 3] *= fade_factor
+        
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        center_point = strip_length // 2
+        
+        # Process each spot for this strip
+        for spot in instate['spots'][strip_id]:
+            # Calculate movement based on speed, time and spot's speed factor
+            movement = base_speed * delta_time * spot['speed_factor']
+            
+            # Update position based on strip type and direction
+            if strip_id in ['left_spine', 'right_spine']:
+                # Spine strips - move downward
+                spot['pos'] = (spot['pos'] + movement) % strip_length
+                
+            elif 'base' in strip.groups:
+                # Base strips - spots move toward center then fade
+                direction = spot['direction']
+                new_pos = spot['pos'] + (movement * direction)
+                
+                # If moving upward and passing center, start fading
+                if direction > 0 and new_pos > center_point:
+                    # Calculate fade based on distance from center
+                    fade_distance = strip_length - center_point
+                    spot['alpha'] = max(0, 1.0 - ((new_pos - center_point) / fade_distance))
+                
+                # If moving downward and passing center, start fading
+                elif direction < 0 and new_pos < center_point:
+                    # Calculate fade based on distance from center
+                    spot['alpha'] = max(0, 1.0 - ((center_point - new_pos) / center_point))
+                
+                # Reset if reaching end
+                if new_pos >= strip_length or new_pos < 0:
+                    if direction > 0:  # Was moving upward
+                        new_pos = 0
+                    else:  # Was moving downward
+                        new_pos = strip_length - 1
+                    spot['alpha'] = 1.0  # Reset alpha
+                
+                spot['pos'] = new_pos
+                
+            elif 'ear' in strip.groups or strip.type == "circle":
+                # Circular movement - just wrap around
+                spot['pos'] = (spot['pos'] + movement) % strip_length
+            
+            # Convert position to integer index
+            idx = int(spot['pos']) % strip_length
+            
+            # Apply the spot color with spot's alpha
+            # Use HSV to RGB conversion for the color using only the provided hue
+            r, g, b = hsv_to_rgb(hue, saturation, value)
+            
+            # Set the pixel with the spot's alpha
+            buffer[idx] = [r, g, b, spot['alpha']]
+            
+            # Add a small glow around the spot (optional)
+            glow_size = 2  # Size of glow effect
+            for i in range(1, glow_size + 1):
+                glow_alpha = spot['alpha'] * (0.7 ** i)  # Exponential falloff
+                
+                # Set pixels before and after with reduced alpha
+                before_idx = (idx - i) % strip_length
+                after_idx = (idx + i) % strip_length
+                
+                buffer[before_idx] = [r, g, b, glow_alpha]
+                buffer[after_idx] = [r, g, b, glow_alpha]

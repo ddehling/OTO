@@ -34,7 +34,7 @@ class InputPanel(QMainWindow):
         
         # Create sliders
         self.sliders = {}
-        slider_names = ["Intensity", "Speed", "Color R", "Color G", "Color B"]
+        slider_names = ["Intensity", "Speed", "Hue"]
         
         for i, name in enumerate(slider_names):
             # Create a horizontal layout for each slider
@@ -83,7 +83,7 @@ class InputPanel(QMainWindow):
         self.mode_group = QButtonGroup(self)
         self.mode_group.setExclusive(True)  # Make buttons exclusive
         
-        mode_names = ["Mode 1", "Mode 2", "Mode 3", "Mode 4"]
+        mode_names = ["Waiting", "Mode 2", "Mode 3", "Mode 4"]
         
         # Default selected mode
         self.values['selected_mode'] = 'none'
@@ -162,26 +162,36 @@ class InputPanel(QMainWindow):
         
     def update_mode_selection(self, button_id):
         """Update selected mode"""
+        # Set the selected mode
         self.values['selected_mode'] = button_id
         
-        # Update button appearance
+        # Set all mode buttons to 0 and the selected one to 1
         for mode_id, button in self.mode_buttons.items():
+            # Create a numeric value for each mode (0 = off, 1 = on)
+            mode_value_key = f"mode_{mode_id}"
             if mode_id == button_id and button.isChecked():
+                self.values[mode_value_key] = 1
                 button.setStyleSheet("background-color: #8CC84B;")
             else:
+                self.values[mode_value_key] = 0
                 button.setStyleSheet("")
                 
         self.values_changed.emit(self.values)
         
     def update_effect_selection(self, button_id):
         """Update selected effect"""
+        # Set the selected effect
         self.values['selected_effect'] = button_id
         
-        # Update button appearance
+        # Set all effect buttons to 0 and the selected one to 1
         for effect_id, button in self.effect_buttons.items():
+            # Create a numeric value for each effect (0 = off, 1 = on)
+            effect_value_key = f"effect_{effect_id}"
             if effect_id == button_id and button.isChecked():
+                self.values[effect_value_key] = 1
                 button.setStyleSheet("background-color: #8CC84B;")
             else:
+                self.values[effect_value_key] = 0
                 button.setStyleSheet("")
                 
         self.values_changed.emit(self.values)
@@ -194,17 +204,19 @@ class InputPanel(QMainWindow):
             
         # Reset mode buttons
         self.mode_group.setExclusive(False)  # Temporarily disable exclusivity
-        for button in self.mode_buttons.values():
+        for button_id, button in self.mode_buttons.items():
             button.setChecked(False)
             button.setStyleSheet("")
+            self.values[f"mode_{button_id}"] = 0
         self.mode_group.setExclusive(True)  # Re-enable exclusivity
         self.values['selected_mode'] = 'none'
             
         # Reset effect buttons
         self.effect_group.setExclusive(False)  # Temporarily disable exclusivity
-        for button in self.effect_buttons.values():
+        for button_id, button in self.effect_buttons.items():
             button.setChecked(False)
             button.setStyleSheet("")
+            self.values[f"effect_{button_id}"] = 0
         self.effect_group.setExclusive(True)  # Re-enable exclusivity
         self.values['selected_effect'] = 'none'
             

@@ -3,7 +3,6 @@ from typing import List, Dict, Any, Optional, Tuple, Literal
 import numpy as np
 import json
 import yaml
-import os
 import math
 
 @dataclass
@@ -175,7 +174,7 @@ class LEDStrip:
         
         # Calculate vectors from center to start and end for verification
         vec_to_start = start - center
-        vec_to_end = end - center
+        #vec_to_end = end - center
         
         # Use the actual radius (distance from center to points)
         radius_actual = np.linalg.norm(vec_to_start)

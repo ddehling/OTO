@@ -3,7 +3,7 @@
     {
       "id": "left_ear_1",
       "length": 60,
-      "groups": ["ear", "left", "east"],
+      "groups": ["ear", "left"],
       "type": "circle",
       "position": {
         "center": [0.0, 10.0, 0.0],
@@ -21,7 +21,7 @@
     {
       "id": "left_ear_2",
       "length": 40,
-      "groups": ["ear", "left", "east"],
+      "groups": ["ear", "left"],
       "type": "circle",
       "position": {
         "center": [0.0, 12.0, 0.0],
@@ -38,7 +38,7 @@
     },    {
       "id": "right_ear_1",
       "length": 60,
-      "groups": ["ear", "right", "east"],
+      "groups": ["ear", "right"],
       "type": "circle",
       "position": {
         "center": [0.0, -10.0, 0.0],
@@ -56,7 +56,7 @@
     {
       "id": "right_ear_2",
       "length": 40,
-      "groups": ["ear", "right", "east"],
+      "groups": ["ear", "right"],
       "type": "circle",
       "position": {
         "center": [0.0, -12.0, 0.0],
@@ -92,7 +92,7 @@
     {
       "id": "spine_1",
       "length": 200,
-      "groups": ["spine", "left", "east"],
+      "groups": ["spine", "left"],
       "type": "line",
       "position": {
         "start": [0.0, 3.0, -7.5],
@@ -126,7 +126,7 @@
     {
       "id": "spine_2",
       "length": 200,
-      "groups": ["spine", "right", "east"],
+      "groups": ["spine", "right"],
       "type": "line",
       "position": {
         "start": [0.0, -3.0, -7.5],
@@ -196,7 +196,7 @@
     {
     "id": "stair_arc_1",
     "length": 300,
-    "groups": ["base", "perimeter"],
+    "groups": ["base","top"],
     "type": "arc",
     "position": {
       "start": [0.0, -20.0, -80.0],
@@ -214,7 +214,7 @@
     {
     "id": "stair_arc_2",
     "length": 400,
-    "groups": ["base", "perimeter"],
+    "groups": ["base","middle"],
     "type": "arc",
     "position": {
       "start": [0.0, -30.0, -90.0],
@@ -232,7 +232,7 @@
     {
     "id": "stair_arc_3",
     "length": 500,
-    "groups": ["base", "perimeter"],
+    "groups": ["base", "bottom"],
     "type": "arc",
     "position": {
       "start": [0.0, -40.0, -100.0],
