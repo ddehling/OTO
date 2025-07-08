@@ -75,8 +75,8 @@ class EventScheduler:
         
         # Define dimensions for multiple frames
         self.strip_manager = StripLoader.from_json("strips.json")  # noqa: F405
-        self.strip_manager.concatenate_strips("left_spine", ["arc_strip_1", "spine_1"])
-        self.strip_manager.concatenate_strips("right_spine", ["arc_strip_2", "spine_2"])
+        #self.strip_manager.concatenate_strips("left_spine", ["arc_strip_1", "spine_1"])
+        #self.strip_manager.concatenate_strips("right_spine", ["arc_strip_2", "spine_2"])
         self.state['strip_manager'] = self.strip_manager
         self.state['buffers'] = BufferManager(self.strip_manager)# noqa: F405
         self.state['output']=self.strip_manager.create_buffers()
@@ -178,10 +178,10 @@ class EventScheduler:
 
 
     def update(self):
-        # Process OSC messages if needed
-        # osc_messages = self.get_osc_messages()
-        # if osc_messages != []:
-        #     self.state['osc_messages'] = osc_messages
+        #Process OSC messages if needed
+        #osc_messages = self.get_osc_messages()
+        #if osc_messages != []:
+        #    self.state['osc_messages'] = osc_messages
 
         self.state['current_time'] = time.time()
         

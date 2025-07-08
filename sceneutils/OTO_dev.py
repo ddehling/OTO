@@ -480,3 +480,84 @@ def OTO_waiting(instate, outstate):
                 
                 buffer[before_idx] = [r, g, b, glow_alpha]
                 buffer[after_idx] = [r, g, b, glow_alpha]
+
+
+# ... existing code ...
+
+def OTO_rgb_test(instate, outstate):
+    """
+    Test pattern that moves 3 adjacent RGB dots through all strips in sequence.
+    The dots (red, green, blue) move based on the speed input, traversing one strip completely 
+    before moving to the next, and repeating the cycle once all strips are traversed.
+    """
+    name = 'rgb_test'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize test pattern state
+        instate['position'] = 0.0  # Floating point position for smooth movement
+        
+        # Get ordered list of all strip IDs
+        strip_ids = list(buffers.get_all_buffers(name).keys())
+        instate['strip_ids'] = strip_ids
+        instate['current_strip_index'] = 0
+        
+        return
+
+    if instate['count'] == -1:
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Set generator alpha to full
+    buffers.generator_alphas[name] = 1.0
+
+    # Get base speed from outstate or use default
+    base_speed = outstate.get('control_speed', 5.0)  # Default 5 pixels per second
+    
+    # Time delta for movement calculation
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Get all strip buffers for our generator
+    all_buffers = buffers.get_all_buffers(name)
+    
+    # Clear all buffers first
+    for strip_id, buffer in all_buffers.items():
+        buffer[:] = [0, 0, 0, 0]
+    
+    # If no strips are available, exit
+    if not instate['strip_ids']:
+        return
+    
+    # Get current strip ID
+    current_strip_id = instate['strip_ids'][instate['current_strip_index']]
+    
+    # Get current strip buffer
+    if current_strip_id in all_buffers:
+        buffer = all_buffers[current_strip_id]
+        strip_length = len(buffer)
+        
+        # Calculate movement based on speed and time
+        movement = base_speed * delta_time
+        instate['position'] += movement
+        
+        # If position exceeds strip length, move to next strip
+        if int(instate['position']) >= strip_length - 2:  # -2 to ensure all 3 dots are visible
+            instate['position'] = 0.0
+            instate['current_strip_index'] = (instate['current_strip_index'] + 1) % len(instate['strip_ids'])
+        
+        # Calculate integer position for the dots
+        pos = int(instate['position'])
+        
+        # Set the 3 adjacent RGB dots
+        if pos < strip_length:
+            buffer[pos] = [1.0, 0.0, 0.0, 1.0]  # Red
+        
+        if pos + 1 < strip_length:
+            buffer[pos + 1] = [0.0, 1.0, 0.0, 1.0]  # Green
+        
+        if pos + 2 < strip_length:
+            buffer[pos + 2] = [0.0, 0.0, 1.0, 1.0]  # Blue
