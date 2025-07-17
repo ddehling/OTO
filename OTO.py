@@ -2,6 +2,7 @@ import numpy as np
 import time
 from corefunctions.Events import EventScheduler
 from sceneutils.OTO_dev import *  # noqa: F403
+from sceneutils.OTO_inactive import *  # noqa: F403
 from corefunctions.input_panel import InputPanel 
  # noqa: F403
 #
@@ -124,9 +125,9 @@ if __name__ == "__main__":
     scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
-    #env_system.scheduler.schedule_event(0, 240, OTO_heartbeat)# noqa: F405
-    #env_system.scheduler.schedule_event(00, 80, OTO_blink)  # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_rgb_test) # noqa: F405
+    #env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
+    #env_system.scheduler.schedule_event(00, 8000000, OTO_blink)  # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_pattern_cycle) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
@@ -142,7 +143,7 @@ if __name__ == "__main__":
             #time.sleep(sleep_time)
 
             # Print stats if needed
-            #print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
             lasttime = time.perf_counter()
 
     except KeyboardInterrupt:
