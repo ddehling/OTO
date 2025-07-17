@@ -62,6 +62,7 @@ class EnvironmentalSystem:
         
         # Apply exponential smoothing and send to scheduler
         for key, raw_value in raw_values.items():
+            #print(key)
             # Handle actual selected_mode and selected_effect without smoothing
             if key in ['selected_mode', 'selected_effect']:
                 self.smoothed_values[key] = raw_value
@@ -127,7 +128,7 @@ if __name__ == "__main__":
    
     #env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
     #env_system.scheduler.schedule_event(00, 8000000, OTO_blink)  # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_pattern_cycle) # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_inactive_pattern_cycle) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
@@ -143,7 +144,7 @@ if __name__ == "__main__":
             #time.sleep(sleep_time)
 
             # Print stats if needed
-            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            #print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
             lasttime = time.perf_counter()
 
     except KeyboardInterrupt:
