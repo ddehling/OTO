@@ -2087,3 +2087,459 @@ def OTO_curious_playful(instate, outstate):
                     min(1.0, b + sb * 0.7),
                     min(1.0, a + 0.3)
                 ]
+
+
+def OTO_passionate_floral(instate, outstate):
+    """
+    Generator function that creates a passionate and playful floral-themed pattern.
+    
+    Features:
+    1. Global alpha controlled by outstate['passionate_curious'] value
+    2. Floral growth patterns that unfold from origination points with pink and dark blue colors
+    3. Hints of green in the growth patterns to represent stems and leaves
+    4. Long, moving stripes that fade away as they move
+    5. Emphasis on growth and movement away from origination points
+    
+    Uses HSV colorspace for color generation and blending.
+    """
+    name = 'passionate_floral'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['bloom_points'] = {}      # Track floral bloom points per strip
+        instate['moving_stripes'] = {}    # Track moving stripe patterns
+        instate['growth_timer'] = 0.0     # Global timer for coordinated growth
+        
+        # Color palette (HSV values)
+        instate['colors'] = {
+            'vivid_pink': [0.9, 0.85, 0.95],      # Vibrant pink
+            'soft_pink': [0.95, 0.6, 0.95],       # Softer pink
+            'deep_blue': [0.65, 0.9, 0.7],        # Deep blue
+            'midnight_blue': [0.7, 0.85, 0.5],    # Darker blue
+            'leaf_green': [0.3, 0.8, 0.6],        # Green for leaves/stems
+            'light_green': [0.35, 0.6, 0.8],      # Lighter green for new growth
+            'white_glow': [0.0, 0.0, 1.0] ,        # White glow for highlights
+            'bright_yellow': [0.15, 0.9, 1.0],    # Bright sunny yellow
+            'golden_yellow': [0.13, 0.85, 0.9]    # Warm golden yellow
+        }
+        
+        # Growth parameters
+        instate['growth_rate'] = 1.0      # Base growth rate
+        instate['max_blooms'] = 8         # Maximum blooms per strip
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get passionate_curious level from outstate (default to 0)
+    passionate_level = outstate.get('control_passionate', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = passionate_level
+    
+    # Skip rendering if alpha is too low
+    if passionate_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * passionate_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Update global growth timer - controls overall growth rhythm
+    instate['growth_timer'] += delta_time
+    growth_phase = (np.sin(instate['growth_timer'] * 0.8) + 1.0) / 2.0  # 0.0-1.0 oscillation
+    
+    # Adjust growth rate based on passionate level - higher = faster growth
+    effective_growth_rate = instate['growth_rate'] * (0.8 + passionate_level * 0.7)
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Process each buffer based on strip type
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        
+        # Start with a dark base
+        buffer[:] = [0.0, 0.0, 0.05, 0.2]  # Very dim blue base
+        
+        # Initialize bloom points for this strip if not already done
+        if strip_id not in instate['bloom_points']:
+            instate['bloom_points'][strip_id] = []
+            instate['moving_stripes'][strip_id] = []
+            
+            # Create initial bloom points
+            # Fix the error by ensuring the high value is always greater than the low value
+            max_blooms = max(1, min(3, strip_length // 40))
+            num_initial_blooms = 1 if max_blooms <= 1 else np.random.randint(1, max_blooms)
+            for _ in range(num_initial_blooms):
+                # Random position along strip
+                pos = np.random.randint(0, strip_length)
+                
+                # Create bloom with random properties
+                create_new_bloom(instate, strip_id, pos, strip_length)
+
+        
+        # Determine strip type for customized effects
+        is_base = 'base' in strip.groups
+        is_spine = 'spine' in strip.groups
+        is_heart = 'heart' in strip.groups
+        is_brain = 'brain' in strip.groups
+        is_ear = 'ear' in strip.groups
+        
+        # Chance to create new bloom points (varies by strip type)
+        bloom_chance = 0.02  # Base chance
+        
+        # Adjust bloom chance based on strip type
+        if is_base:
+            bloom_chance = 0.03  # More blooms on base strips
+        elif is_spine:
+            bloom_chance = 0.02  # Average on spine
+        elif is_heart:
+            bloom_chance = 0.04  # More on heart
+        elif is_brain or is_ear:
+            bloom_chance = 0.025  # Slightly more on brain/ear
+            
+        # Adjust based on number of existing blooms (less likely if many exist)
+        max_blooms = instate['max_blooms']
+        existing_blooms = len(instate['bloom_points'][strip_id])
+        bloom_chance *= max(0.1, 1.0 - (existing_blooms / max_blooms))
+        
+        # Also factor in passionate level - more passion, more blooms
+        bloom_chance *= (0.5 + passionate_level * 1.0)
+        
+        # Try to create a new bloom
+        if np.random.random() < bloom_chance * delta_time * 60:  # Scale by framerate
+            # Choose a random position
+            pos = np.random.randint(0, strip_length)
+            
+            # Check if there's already a bloom nearby
+            too_close = False
+            for bloom in instate['bloom_points'][strip_id]:
+                # Calculate distance considering wrapping
+                direct_dist = abs(pos - bloom['position'])
+                wrapped_dist = strip_length - direct_dist
+                distance = min(direct_dist, wrapped_dist)
+                
+                # Skip if too close to an existing bloom
+                if distance < strip_length * 0.15:  # Minimum 15% of strip length between blooms
+                    too_close = True
+                    break
+            
+            # Create new bloom if not too close to existing ones
+            if not too_close and existing_blooms < max_blooms:
+                create_new_bloom(instate, strip_id, pos, strip_length)
+        
+        # Chance to create new moving stripes
+        stripe_chance = 0.01  # Base chance
+        
+        # Adjust stripe chance based on strip type
+        if is_base:
+            stripe_chance = 0.02  # More stripes on base
+        elif is_spine:
+            stripe_chance = 0.03  # Most on spine
+        
+        # Adjust based on passionate level
+        stripe_chance *= (0.5 + passionate_level * 1.0)
+        
+        # Try to create a new stripe
+        if np.random.random() < stripe_chance * delta_time * 60:  # Scale by framerate
+            # Choose a random position
+            pos = np.random.randint(0, strip_length)
+            
+            # Random direction
+            direction = 1 if np.random.random() < 0.5 else -1
+            
+            # Random color - primarily pinks and blues
+            if np.random.random() < 0.6:  # 60% pink, 40% blue
+                color_name = np.random.choice(['vivid_pink', 'soft_pink'])
+            else:
+                color_name = np.random.choice(['deep_blue', 'midnight_blue'])
+            
+            h, s, v = instate['colors'][color_name]
+            
+            # Create a new stripe
+            instate['moving_stripes'][strip_id].append({
+                'position': pos,
+                'direction': direction,
+                'speed': 20 + np.random.random() * 40,  # 20-60 pixels per second
+                'length': 10 + np.random.randint(0, int(strip_length * 0.2)),  # 10 to 20% of strip length
+                'h': h,
+                's': s,
+                'v': v,
+                'alpha': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 alpha
+                'age': 0.0,
+                'lifetime': 2.0 + np.random.random() * 3.0  # 2-5 seconds lifetime
+            })
+        
+        # Update and render bloom points
+        new_blooms = []
+        for bloom in instate['bloom_points'][strip_id]:
+            # Update growth stage
+            bloom['age'] += delta_time * effective_growth_rate
+            
+            # Calculate growth factor (0.0-1.0)
+            growth_progress = min(1.0, bloom['age'] / bloom['growth_time'])
+            
+            # Calculate the bloom's current radius based on growth
+            # Use sigmoid-like function for natural growth curve
+            growth_factor = 1.0 / (1.0 + np.exp(-10 * (growth_progress - 0.5)))
+            current_radius = bloom['max_radius'] * growth_factor
+            
+            # Calculate pulsing effect for grown blooms
+            pulse_factor = 1.0
+            if growth_progress > 0.9:  # Almost fully grown
+                # Add gentle pulsing
+                pulse_time = outstate['current_time'] * bloom['pulse_rate']
+                pulse_factor = 1.0 + 0.1 * np.sin(pulse_time) * (growth_progress - 0.9) * 10
+            
+            # Calculate final radius with pulse
+            render_radius = current_radius * pulse_factor
+            
+            # Keep bloom if still within lifetime
+            if bloom['age'] < bloom['lifetime']:
+                new_blooms.append(bloom)
+                
+                # Calculate alpha based on growth and lifetime
+                if bloom['age'] < bloom['growth_time']:
+                    # Growing phase - fade in
+                    alpha_factor = growth_progress
+                else:
+                    # Mature phase - maintain then fade out near end of life
+                    life_remaining = 1.0 - ((bloom['age'] - bloom['growth_time']) / 
+                                           (bloom['lifetime'] - bloom['growth_time']))
+                    alpha_factor = max(0.0, life_remaining)
+                
+                # Draw the bloom
+                draw_bloom(buffer, strip_length, bloom, render_radius, alpha_factor, instate['colors'])
+                
+                # Chance to create a leaf or tendril from mature blooms
+                if growth_progress > 0.5 and np.random.random() < 0.01 * delta_time * 60:
+                    # Create a moving stripe that originates from this bloom
+                    direction = 1 if np.random.random() < 0.5 else -1
+                    
+                    # Use green for leaves/tendrils
+                    color_name = np.random.choice(['leaf_green', 'light_green'])
+                    h, s, v = instate['colors'][color_name]
+                    
+                    # Create a new stripe
+                    instate['moving_stripes'][strip_id].append({
+                        'position': bloom['position'],
+                        'direction': direction,
+                        'speed': 30 + np.random.random() * 30,  # 30-60 pixels per second
+                        'length': 5 + np.random.randint(0, 10),  # 5-15 pixels
+                        'h': h,
+                        's': s,
+                        'v': v,
+                        'alpha': 0.6 + np.random.random() * 0.4,  # 0.6-1.0 alpha
+                        'age': 0.0,
+                        'lifetime': 1.0 + np.random.random() * 2.0  # 1-3 seconds lifetime
+                    })
+            
+        # Update bloom list
+        instate['bloom_points'][strip_id] = new_blooms
+        
+        # Update and render moving stripes
+        new_stripes = []
+        for stripe in instate['moving_stripes'][strip_id]:
+            # Update position
+            stripe['position'] += stripe['speed'] * stripe['direction'] * delta_time
+            
+            # Update age
+            stripe['age'] += delta_time
+            
+            # Check if stripe is still visible and within lifetime
+            if stripe['age'] < stripe['lifetime']:
+                new_stripes.append(stripe)
+                
+                # Calculate alpha based on age
+                if stripe['age'] < stripe['lifetime'] * 0.2:
+                    # Fade in
+                    alpha_factor = stripe['age'] / (stripe['lifetime'] * 0.2)
+                else:
+                    # Fade out gradually
+                    alpha_factor = 1.0 - ((stripe['age'] - stripe['lifetime'] * 0.2) / 
+                                         (stripe['lifetime'] * 0.8))
+                
+                # Calculate final alpha
+                alpha = stripe['alpha'] * alpha_factor
+                
+                # Draw the stripe with fading trail
+                draw_stripe(buffer, strip_length, stripe, alpha)
+                
+        # Update stripe list
+        instate['moving_stripes'][strip_id] = new_stripes
+
+def create_new_bloom(instate, strip_id, position, strip_length):
+    """Helper function to create a new bloom point with randomized properties"""
+    # Randomly choose between pink and blue for primary color
+    if np.random.random() < 0.7:  # 70% pink, 30% blue
+        primary_color = np.random.choice(['vivid_pink', 'soft_pink'])
+    else:
+        primary_color = np.random.choice(['deep_blue', 'midnight_blue'])
+    
+    # Random secondary color for variation
+    if primary_color in ['vivid_pink', 'soft_pink']:
+        # Pink primary, blue secondary
+        secondary_color = np.random.choice(['deep_blue', 'midnight_blue'])
+    else:
+        # Blue primary, pink secondary
+        secondary_color = np.random.choice(['vivid_pink', 'soft_pink'])
+    
+    # Random growth time and lifetime
+    growth_time = 2.0 + np.random.random() * 3.0  # 2-5 seconds to fully grow
+    lifetime = growth_time + 3.0 + np.random.random() * 10.0  # Additional 3-13 seconds before fading
+    
+    # Create the bloom
+    instate['bloom_points'][strip_id].append({
+        'position': position,
+        'max_radius': 5 + np.random.randint(5, max(6, int(strip_length * 0.15))),  # 5-15% of strip length
+        'primary_color': primary_color,
+        'secondary_color': secondary_color,
+        'accent_color': 'leaf_green' if np.random.random() < 0.7 else 'light_green',  # Green accent
+        'layers': 2 + np.random.randint(0, 3),  # 2-4 layers
+        'age': 0.0,
+        'growth_time': growth_time,
+        'lifetime': lifetime,
+        'pulse_rate': 1.0 + np.random.random() * 2.0,  # 1-3 Hz pulse when mature
+        'rotation': np.random.random() * 2 * np.pi  # Random initial rotation
+    })
+
+def draw_bloom(buffer, strip_length, bloom, radius, alpha_factor, colors):
+    """Draws a floral bloom with multiple layers and colors"""
+    center = int(bloom['position'])
+    radius_int = int(radius)
+    
+    # Get colors from palette
+    primary_h, primary_s, primary_v = colors[bloom['primary_color']]
+    secondary_h, secondary_s, secondary_v = colors[bloom['secondary_color']]
+    accent_h, accent_s, accent_v = colors[bloom['accent_color']]
+    
+    # Calculate layer spacing
+    layer_spacing = max(1, radius_int // bloom['layers'])
+    
+    # Draw layers from outside in
+    for layer in range(bloom['layers']):
+        # Calculate layer radius
+        layer_radius = radius_int - layer * layer_spacing
+        if layer_radius <= 0:
+            continue
+            
+        # Calculate layer properties
+        layer_norm = layer / max(1, bloom['layers'] - 1)  # 0.0 for outer layer, 1.0 for inner
+        
+        # Interpolate colors between primary and secondary
+        h = primary_h * (1.0 - layer_norm) + secondary_h * layer_norm
+        s = primary_s * (1.0 - layer_norm) + secondary_s * layer_norm
+        v = primary_v * (1.0 - layer_norm) + secondary_v * layer_norm
+        
+        # Inner layers are brighter
+        v = min(1.0, v * (1.0 + layer_norm * 0.3))
+        
+        # For the innermost layer, blend with white for a glowing center
+        if layer == bloom['layers'] - 1:
+            s *= 0.6  # Reduce saturation
+            v = min(1.0, v * 1.2)  # Increase brightness
+        
+        # Convert to RGB
+        r, g, b = hsv_to_rgb(h, s, v)
+        
+        # Calculate layer alpha - inner layers more transparent for a glowing effect
+        layer_alpha = (0.7 + 0.3 * layer_norm) * alpha_factor
+        
+        # Draw the layer with petal-like pattern
+        num_petals = 5 + layer  # More petals on outer layers
+        rotation = bloom['rotation'] + layer * 0.2  # Rotate each layer slightly
+        
+        for i in range(-layer_radius, layer_radius + 1):
+            pixel_pos = (center + i) % strip_length
+            
+            # Calculate distance from center
+            dist = abs(i) / layer_radius
+            
+            # Calculate angle from center
+            angle = np.arccos(1.0 - dist) if dist < 1.0 else 0
+            angle = (angle + rotation) % (2 * np.pi)
+            
+            # Create petal pattern
+            petal_factor = 0.5 + 0.5 * np.cos(angle * num_petals)
+            
+            # Calculate pixel intensity - stronger at petal centers
+            intensity = (1.0 - dist**2) * petal_factor
+            
+            # Skip if too dim
+            if intensity < 0.05:
+                continue
+                
+            # Apply color with intensity
+            pixel_alpha = layer_alpha * intensity
+            
+            # Occasionally add green accent color for leaf-like details
+            if layer < bloom['layers'] - 1 and np.random.random() < 0.1:
+                r, g, b = hsv_to_rgb(accent_h, accent_s, accent_v)
+                
+            # Blend with existing pixel
+            curr_r, curr_g, curr_b, curr_a = buffer[pixel_pos]
+            new_r = max(curr_r, r * intensity)
+            new_g = max(curr_g, g * intensity)
+            new_b = max(curr_b, b * intensity)
+            new_a = max(curr_a, pixel_alpha)
+            
+            buffer[pixel_pos] = [new_r, new_g, new_b, new_a]
+
+def draw_stripe(buffer, strip_length, stripe, alpha):
+    """Draws a moving stripe with a fading trail"""
+    # Get stripe properties
+    pos = int(stripe['position']) % strip_length
+    length = stripe['length']
+    direction = stripe['direction']
+    h, s, v = stripe['h'], stripe['s'], stripe['v']
+    
+    # Convert base color to RGB
+    base_r, base_g, base_b = hsv_to_rgb(h, s, v)
+    
+    # Draw the stripe with fading trail
+    for i in range(length):
+        # Calculate position with direction
+        pixel_pos = (pos - i * direction) % strip_length
+        
+        # Calculate intensity based on position in stripe
+        # Head of stripe is brightest, fades toward tail
+        intensity = 1.0 - (i / length)**1.5
+        
+        # Skip if too dim
+        if intensity < 0.05:
+            continue
+            
+        # Calculate color with intensity
+        r = base_r * intensity
+        g = base_g * intensity
+        b = base_b * intensity
+        a = alpha * intensity
+        
+        # Blend with existing pixel
+        curr_r, curr_g, curr_b, curr_a = buffer[pixel_pos]
+        new_r = max(curr_r, r)
+        new_g = max(curr_g, g)
+        new_b = max(curr_b, b)
+        new_a = max(curr_a, a)
+        
+        buffer[pixel_pos] = [new_r, new_g, new_b, new_a]
