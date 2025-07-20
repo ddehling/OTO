@@ -867,4 +867,458 @@ def OTO_sunrise_joy(instate, outstate):
             # Set buffer values (vectorized)
             buffer[:] = rgba_values
 
-# ... existing code ...
+def OTO_sad_theme(instate, outstate):
+    """
+    Generator function that creates a sad-themed pattern across all strips.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_sad'] value
+    2. Dark blues and grey-blues are the predominant colors 
+    3. Blue raindrops on the spines with long trails that roll down and turn grey
+       then wrap around to the top when they reach the bottom
+    4. Similar raindrops on base strips moving in both directions with consistent respawning
+    5. Asynchronous grey and blue heartbeat on heart strips with brighter, longer pulses
+    6. Grey and white spots that blow away like dandelion seeds on brain and ear strips
+    """
+    name = 'sad_theme'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['raindrops'] = {}  # For tracking raindrops on spine strips
+        instate['heart_phase_left'] = 0.0  # For left heartbeat timing
+        instate['heart_phase_right'] = 0.5  # For right heartbeat timing (start offset)
+        instate['dandelion_seeds'] = {}  # For tracking floating seeds
+        instate['last_drop_time'] = {}  # Time tracker for raindrop creation (per strip)
+        
+        # Color palette (HSV values)
+        instate['colors'] = {
+            'deep_blue': [0.6, 0.8, 0.4],  # Deep blue
+            'grey_blue': [0.6, 0.3, 0.5],  # Grey-blue
+            'light_grey': [0.0, 0.0, 0.7],  # Light grey
+            'dark_grey': [0.0, 0.0, 0.3],   # Dark grey
+            'white': [0.0, 0.0, 0.9]        # Almost white
+        }
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get sad level from outstate (default to 0)
+    sad_level = outstate.get('control_sad', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = sad_level
+    
+    # Skip rendering if alpha is too low
+    if sad_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * sad_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Update heartbeat phases - slow heartbeat around 40 BPM with slight variation between sides
+    beats_per_second_left = 38 / 60.0  # Slightly slower for left
+    beats_per_second_right = 42 / 60.0  # Slightly faster for right
+    
+    instate['heart_phase_left'] = (instate['heart_phase_left'] + beats_per_second_left * delta_time) % 1.0
+    instate['heart_phase_right'] = (instate['heart_phase_right'] + beats_per_second_right * delta_time) % 1.0
+    
+    # Process each buffer based on strip type
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        
+        # Start with a dim base color - slight grey-blue tint
+        base_hue, base_sat, base_val = instate['colors']['grey_blue']
+        base_r, base_g, base_b = hsv_to_rgb(base_hue, base_sat * 0.5, base_val * 0.3)
+        buffer[:] = [base_r, base_g, base_b, 0.2]  # Very dim base
+        
+        # Different effects based on strip type
+        if 'spine' in strip.groups or 'base' in strip.groups:
+            # Spine and base strips - raindrops effect
+            
+            # Initialize raindrops for this strip if not already done
+            if strip_id not in instate['raindrops']:
+                instate['raindrops'][strip_id] = []
+                instate['last_drop_time'][strip_id] = 0.0
+                
+                # Pre-populate with some initial raindrops
+                num_initial_drops = strip_length // 5  # About 1 drop every 5 pixels
+                for _ in range(num_initial_drops):
+                    # Random position along strip
+                    pos = np.random.randint(0, strip_length)
+                    
+                    # For base strips, determine direction based on position
+                    direction = 1  # Default downward for spine
+                    if 'base' in strip.groups:
+                        # For base: if in left half, move right; if in right half, move left
+                        middle = strip_length // 2
+                        direction = 1 if pos < middle else -1
+                    
+                    # Initial color phase based on position
+                    color_phase = pos / strip_length if 'spine' in strip.groups else np.random.random()
+                    
+                    instate['raindrops'][strip_id].append({
+                        'position': pos,
+                        'speed': 8 + np.random.random() * 12,  # 8-20 pixels per second
+                        'size': 8 + np.random.randint(0, 8),  # 8-15 pixels for longer trails
+                        'color_phase': color_phase,  # 0.0 = blue, 1.0 = grey
+                        'alpha': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 alpha
+                        'direction': direction,  # 1 for down, -1 for up (base strips)
+                        'life_cycles': 0  # Track how many times the drop has cycled
+                    })
+            
+            # Get number of active drops for this strip
+            active_drops = len(instate['raindrops'][strip_id])
+            
+            # Determine target number of drops based on strip type and length
+            if 'spine' in strip.groups:
+                target_drops = max(5, strip_length // 8)  # More drops on spine
+            else:  # base strips
+                target_drops = max(6, strip_length // 10)  # Slightly fewer on base, but ensure at least 6
+            
+            # Get current time
+            current_time = outstate['current_time']
+            
+            # Check last drop time for this specific strip
+            if strip_id not in instate['last_drop_time']:
+                instate['last_drop_time'][strip_id] = current_time - 1.0  # Immediate creation
+            
+            # Calculate time since last drop for this strip
+            time_since_last_drop = current_time - instate['last_drop_time'][strip_id]
+            
+            # Determine if we should create a new drop
+            # More aggressive spawning for base strips
+            if 'base' in strip.groups:
+                # For base strips: create drops more aggressively if below target
+                min_time_between_drops = 0.1 if active_drops < target_drops else 0.5
+                should_create_drop = time_since_last_drop > min_time_between_drops
+                # Force creation if severely below target
+                if active_drops < target_drops * 0.5:
+                    should_create_drop = time_since_last_drop > 0.05
+            else:
+                # For spine strips: standard creation logic
+                should_create_drop = (active_drops < target_drops and time_since_last_drop > 0.1) or time_since_last_drop > 0.5
+            
+            # Create new drops as needed
+            if should_create_drop:
+                instate['last_drop_time'][strip_id] = current_time
+                
+                # Higher creation chance if below target
+                creation_chance = 0.9 if active_drops < target_drops * 0.8 else 0.4
+                
+                # For base strips, even higher chance if very low on drops
+                if 'base' in strip.groups and active_drops < target_drops * 0.5:
+                    creation_chance = 0.95
+                
+                if np.random.random() < creation_chance:
+                    # For spine: always start at top
+                    if 'spine' in strip.groups:
+                        pos = 0
+                        direction = 1  # Down
+                        color_phase = 0.0  # Start blue
+                    # For base: start at either end with equal probability
+                    elif 'base' in strip.groups:
+                        start_left = np.random.random() < 0.5  # 50% chance to start from left
+                        pos = 0 if start_left else strip_length - 1
+                        direction = 1 if start_left else -1  # Direction based on starting position
+                        color_phase = 0.0  # Start blue
+                    
+                    instate['raindrops'][strip_id].append({
+                        'position': pos,
+                        'speed': 8 + np.random.random() * 12,  # 8-20 pixels per second
+                        'size': 18 + np.random.randint(0, 8),  # 8-15 pixels for longer trails
+                        'color_phase': color_phase,
+                        'alpha': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 alpha
+                        'direction': direction,
+                        'life_cycles': 0  # New drop starts with 0 cycles
+                    })
+            
+            # Update existing raindrops
+            new_raindrops = []
+            for drop in instate['raindrops'][strip_id]:
+                # Update position based on direction
+                drop['position'] += drop['speed'] * drop['direction'] * delta_time
+                
+                # Handle wrapping when drops reach the ends of the strip
+                if 'spine' in strip.groups:
+                    # For spine strips:
+                    if drop['position'] >= strip_length:
+                        # When drop reaches bottom, wrap to top with new properties
+                        drop['position'] = 0
+                        drop['color_phase'] = 0.0  # Reset to blue
+                        drop['speed'] = 8 + np.random.random() * 12  # New random speed
+                        drop['alpha'] = 0.7 + np.random.random() * 0.3  # New random alpha
+                        drop['life_cycles'] += 1  # Increment cycle count
+                elif 'base' in strip.groups:
+                    # For base strips: handle boundary conditions
+                    if drop['position'] >= strip_length:
+                        # Reached right end
+                        drop['position'] = 0  # Wrap to left end
+                        drop['direction'] = 1  # Set direction to right
+                        drop['color_phase'] = 0.0  # Reset to blue
+                        drop['alpha'] = 0.7 + np.random.random() * 0.3  # New random alpha
+                        drop['life_cycles'] = 0  # Reset cycle count for consistent respawning
+                    elif drop['position'] < 0:
+                        # Reached left end
+                        drop['position'] = strip_length - 1  # Wrap to right end
+                        drop['direction'] = -1  # Set direction to left
+                        drop['color_phase'] = 0.0  # Reset to blue
+                        drop['alpha'] = 0.7 + np.random.random() * 0.3  # New random alpha
+                        drop['life_cycles'] = 0  # Reset cycle count for consistent respawning
+                    
+                    # Check if drop has reached the middle
+                    middle = strip_length // 2
+                    middle_range = strip_length * 0.1  # 10% of strip length around middle
+                    
+                    # If moving right (direction=1) and passed middle
+                    if (drop['direction'] > 0 and 
+                        middle - middle_range/2 < drop['position'] < middle + middle_range/2):
+                        # Small chance to reverse direction at middle
+                        if np.random.random() < 0.1:  # 10% chance per frame when in middle zone
+                            drop['direction'] = -1
+                            drop['alpha'] *= 0.9  # Slightly reduce alpha
+                    
+                    # If moving left (direction=-1) and passed middle
+                    elif (drop['direction'] < 0 and 
+                          middle - middle_range/2 < drop['position'] < middle + middle_range/2):
+                        # Small chance to reverse direction at middle
+                        if np.random.random() < 0.1:  # 10% chance per frame when in middle zone
+                            drop['direction'] = 1
+                            drop['alpha'] *= 0.9  # Slightly reduce alpha
+                
+                # Update color phase (transition from blue to grey as it moves)
+                if 'spine' in strip.groups:
+                    # For spine: change color based on distance from top
+                    drop['color_phase'] = min(1.0, drop['position'] / strip_length)
+                elif 'base' in strip.groups:
+                    # For base: change color based on distance from middle
+                    middle = strip_length // 2
+                    distance_from_middle = abs(drop['position'] - middle) / (strip_length / 2)
+                    drop['color_phase'] = distance_from_middle
+                
+                # Gradually reduce alpha over multiple life cycles (slower for spine, faster for base)
+                if 'spine' in strip.groups:
+                    max_cycles = 3  # Spine drops can cycle more times
+                    cycle_alpha_reduction = 0.1  # Smaller reduction per cycle
+                else:  # base strips
+                    max_cycles = 3  # Base drops can now cycle more times too
+                    cycle_alpha_reduction = 0.05  # Much smaller reduction for base (more persistent)
+                
+                # Apply alpha reduction based on cycle count
+                if drop['life_cycles'] > 0:
+                    drop['alpha'] *= (1.0 - (drop['life_cycles'] * cycle_alpha_reduction))
+                
+                # For base strips: ensure drops don't fade too much
+                if 'base' in strip.groups:
+                    drop['alpha'] = max(0.3, drop['alpha'])  # Maintain minimum visibility
+                
+                # Add drop to new list if it's still active and hasn't cycled too many times
+                if drop['alpha'] > 0.1 and drop['life_cycles'] < max_cycles:
+                    new_raindrops.append(drop)
+                    
+                    # Draw the raindrop
+                    pos_int = int(drop['position'])
+                    
+                    # Interpolate between deep blue and grey
+                    blue_h, blue_s, blue_v = instate['colors']['deep_blue']
+                    grey_h, grey_s, grey_v = instate['colors']['dark_grey']
+                    
+                    h = blue_h + (grey_h - blue_h) * drop['color_phase']
+                    s = blue_s + (grey_s - blue_s) * drop['color_phase']
+                    v = blue_v + (grey_v - blue_v) * drop['color_phase']
+                    
+                    r, g, b = hsv_to_rgb(h, s, v)
+                    
+                    # Draw main drop
+                    if 0 <= pos_int < strip_length:
+                        buffer[pos_int] = [r, g, b, drop['alpha']]
+                    
+                    # Draw drop trail (longer with gradual fade)
+                    for i in range(1, drop['size']):
+                        # Trail position depends on direction
+                        trail_pos = pos_int - (i * drop['direction'])
+                        
+                        # Handle trail wrapping
+                        if trail_pos >= strip_length:
+                            trail_pos = trail_pos - strip_length
+                        elif trail_pos < 0:
+                            trail_pos = strip_length + trail_pos
+                        
+                        if 0 <= trail_pos < strip_length:
+                            # Fade alpha for trail - more gradual fade
+                            trail_alpha = drop['alpha'] * (1 - (i / drop['size'])**1.5)
+                            
+                            # Slight color adjustment for trail (more grey as it trails)
+                            trail_phase = min(1.0, drop['color_phase'] + (i / drop['size']) * 0.3)
+                            trail_h = blue_h + (grey_h - blue_h) * trail_phase
+                            trail_s = blue_s + (grey_s - blue_s) * trail_phase
+                            trail_v = blue_v + (grey_v - blue_v) * trail_phase
+                            
+                            tr, tg, tb = hsv_to_rgb(trail_h, trail_s, trail_v)
+                            buffer[trail_pos] = [tr, tg, tb, trail_alpha]
+            
+            # Replace with updated list
+            instate['raindrops'][strip_id] = new_raindrops
+            
+        elif 'heart' in strip.groups:
+            # Heart strips - asynchronous heartbeat with grey-blue color
+            
+            # Determine which phase to use based on left/right
+            is_left = 'left' in strip.groups
+            current_phase = instate['heart_phase_left'] if is_left else instate['heart_phase_right']
+            
+            # Create heartbeat waveform with longer linger
+            if current_phase < 0.1:
+                # Sharp rise (systole)
+                intensity = current_phase / 0.1
+            elif current_phase < 0.3:
+                # Peak plateau (longer linger at peak)
+                intensity = 1.0
+            elif current_phase < 0.6:
+                # First decline (early diastole) - more gradual
+                intensity = 1.0 - 0.7 * ((current_phase - 0.3) / 0.3)
+            else:
+                # Second, more gradual decline (late diastole)
+                intensity = 0.3 - 0.3 * ((current_phase - 0.6) / 0.4)
+            
+            # Stronger heartbeat but still sad
+            intensity *= 0.9
+            
+            # Use different color based on left/right heart
+            if is_left:
+                # Left heart - more grey
+                h, s, v = instate['colors']['dark_grey']
+                # Make peak brighter
+                v_peak = min(1.0, v * 2.5)
+            else:
+                # Right heart - more blue
+                h, s, v = instate['colors']['grey_blue']
+                # Make peak brighter
+                v_peak = min(1.0, v * 2.0)
+            
+            # Adjust value based on heartbeat intensity - more dramatic range
+            v_adjusted = v * 0.3 + v_peak * 0.7 * intensity
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v_adjusted)
+            
+            # Set uniform color for the heart strip with brighter alpha at peak
+            alpha = 0.3 + 0.7 * intensity
+            buffer[:] = [r, g, b, alpha]
+            
+        elif 'brain' in strip.groups or 'ear' in strip.groups:
+            # Brain and ear strips - dandelion seeds effect
+            
+            # Initialize seed particles for this strip if not already done
+            if strip_id not in instate['dandelion_seeds']:
+                instate['dandelion_seeds'][strip_id] = []
+                
+                # Create initial seeds (more for longer strips)
+                num_seeds = max(3, strip_length // 10)
+                for _ in range(num_seeds):
+                    # Random starting position
+                    pos = np.random.randint(0, strip_length)
+                    
+                    # Random seed properties
+                    instate['dandelion_seeds'][strip_id].append({
+                        'position': pos,
+                        'speed': 3 + np.random.random() * 7,  # 3-10 pixels per second
+                        'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
+                        'color': 'white' if np.random.random() < 0.3 else 'light_grey',  # Mostly grey with some white
+                        'alpha': 0.5 + np.random.random() * 0.5,  # 0.5-1.0 alpha
+                        'fade_rate': 0.05 + np.random.random() * 0.15  # How quickly it fades
+                    })
+            
+            # Chance to add new seeds
+            if np.random.random() < 0.05:  # 5% chance per frame
+                pos = np.random.randint(0, strip_length)
+                instate['dandelion_seeds'][strip_id].append({
+                    'position': pos,
+                    'speed': 3 + np.random.random() * 7,
+                    'direction': 1 if np.random.random() < 0.5 else -1,
+                    'color': 'white' if np.random.random() < 0.3 else 'light_grey',
+                    'alpha': 0.5 + np.random.random() * 0.5,
+                    'fade_rate': 0.05 + np.random.random() * 0.15
+                })
+            
+            # Update existing seeds
+            new_seeds = []
+            for seed in instate['dandelion_seeds'][strip_id]:
+                # Update position
+                seed['position'] += seed['speed'] * seed['direction'] * delta_time
+                
+                # Handle wrapping for positions
+                if seed['position'] >= strip_length:
+                    seed['position'] = 0
+                elif seed['position'] < 0:
+                    seed['position'] = strip_length - 1
+                
+                # Gradually fade
+                seed['alpha'] -= seed['fade_rate'] * delta_time
+                
+                # Keep if still visible
+                if seed['alpha'] > 0.05:
+                    new_seeds.append(seed)
+                    
+                    # Draw the seed
+                    pos_int = int(seed['position'])
+                    
+                    # Get color
+                    h, s, v = instate['colors'][seed['color']]
+                    r, g, b = hsv_to_rgb(h, s, v)
+                    
+                    # Set pixel
+                    buffer[pos_int] = [r, g, b, seed['alpha']]
+                    
+                    # Add small glow
+                    for i in range(1, 3):
+                        glow_pos = (pos_int + i) % strip_length
+                        glow_pos2 = (pos_int - i) % strip_length
+                        glow_alpha = seed['alpha'] * (1 - (i / 3))
+                        
+                        buffer[glow_pos] = [r, g, b, glow_alpha]
+                        buffer[glow_pos2] = [r, g, b, glow_alpha]
+            
+            # Replace with updated list
+            instate['dandelion_seeds'][strip_id] = new_seeds
+            
+        else:
+            # Other strips - subtle blue-grey pulsing
+            
+            # Calculate pulsing effect
+            pulse = 0.3 + 0.2 * np.sin(outstate['current_time'] * 0.5)
+            
+            # Get color - grey-blue
+            h, s, v = instate['colors']['grey_blue']
+            
+            # Adjust value based on pulse
+            v = v * pulse
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v)
+            
+            # Set uniform color for the strip
+            buffer[:] = [r, g, b, 0.3]

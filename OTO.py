@@ -129,6 +129,7 @@ if __name__ == "__main__":
     #env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
     #env_system.scheduler.schedule_event(00, 8000000, OTO_blink)  # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_sunrise_joy) # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_sad_theme) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
