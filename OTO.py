@@ -136,6 +136,7 @@ if __name__ == "__main__":
     env_system.scheduler.schedule_event(00, 8000000, OTO_passionate_floral) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_rage_lightning) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_contemplative_cosmic) # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_neutral_positive) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
@@ -151,7 +152,7 @@ if __name__ == "__main__":
             #time.sleep(sleep_time)
 
             # Print stats if needed
-            #print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
             lasttime = time.perf_counter()
 
     except KeyboardInterrupt:

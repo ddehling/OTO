@@ -3265,3 +3265,551 @@ def OTO_contemplative_cosmic(instate, outstate):
         
         # Update firefly list
         instate['fireflies'][strip_id] = new_fireflies
+        
+def OTO_neutral_positive(instate, outstate):
+    """
+    Generator function that creates a neutral/positive-themed pattern across all strips.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_neutral'] value
+    2. Evokes sun shining through green tree foliage and sunflowers
+    3. Brain strips pulse with gold and yellow colors with occasional flashes
+    4. Base strips show light blue with ripples like a shallow ocean viewed from underwater
+    5. Overall creates a peaceful, natural, positive atmosphere
+    
+    Optimized with numpy vectorization for performance.
+    """
+    name = 'neutral_positive'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['sun_rays'] = {}          # Track sun ray effects
+        instate['foliage'] = {}           # Track foliage patterns
+        instate['sunflowers'] = {}        # Track sunflower patterns
+        instate['brain_pulse'] = {}       # Track brain pulse state
+        instate['water_ripples'] = {}     # Track water ripple effects
+        instate['flash_timer'] = 0.0      # Timer for occasional flashes
+        
+        # Color palette (HSV values)
+        instate['colors'] = {
+            'sunshine_yellow': [0.13, 0.85, 0.95],   # Bright sunshine yellow
+            'golden_sun': [0.11, 0.9, 0.9],          # Golden sunlight
+            'leaf_green_light': [0.3, 0.7, 0.7],     # Light green foliage
+            'leaf_green_dark': [0.35, 0.8, 0.5],     # Darker green foliage
+            'sky_blue': [0.6, 0.3, 0.95],            # Light sky blue
+            'water_blue': [0.55, 0.6, 0.8],          # Ocean water blue
+            'sunflower_center': [0.09, 0.9, 0.7],    # Sunflower center brown
+            'sunflower_petal': [0.13, 1.0, 1.0]      # Bright sunflower petal
+        }
+        
+        # Initialize brain pulse parameters
+        instate['brain_pulse_rate'] = 0.5           # Pulses per second
+        instate['brain_flash_chance'] = 0.02        # Chance per second for a flash
+        instate['global_sun_position'] = 0.0        # Global sun position (0.0-1.0)
+        instate['sun_movement_speed'] = 0.05        # Speed of sun movement
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get neutral level from outstate (default to 0)
+    neutral_level = outstate.get('control_neutral', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = neutral_level
+    
+    # Skip rendering if alpha is too low
+    if neutral_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * neutral_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    current_time = outstate['current_time']
+    
+    # Update global sun position (0.0-1.0 cycle)
+    instate['global_sun_position'] = (instate['global_sun_position'] + 
+                                      instate['sun_movement_speed'] * delta_time) % 1.0
+    
+    # Update flash timer for brain effects
+    instate['flash_timer'] += delta_time
+    should_flash = False
+    if instate['flash_timer'] >= 1.0:  # Check once per second
+        instate['flash_timer'] = 0.0
+        if np.random.random() < instate['brain_flash_chance']:
+            should_flash = True
+    
+    # Calculate global sun visibility factor
+    sun_factor = 0.5 + 0.5 * np.sin(instate['global_sun_position'] * 2 * np.pi)
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Process each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        strip_groups = strip.groups
+        
+        # Initialize elements for this strip if not already done
+        if strip_id not in instate['sun_rays']:
+            # Create sun rays
+            instate['sun_rays'][strip_id] = []
+            num_rays = max(2, strip_length // 20)  # About 1 ray per 20 pixels
+            
+            for _ in range(num_rays):
+                pos = np.random.randint(0, strip_length)
+                width = 3 + np.random.randint(0, 7)  # 3-10 pixels wide
+                
+                instate['sun_rays'][strip_id].append({
+                    'position': pos,
+                    'width': width,
+                    'intensity': 0.6 + np.random.random() * 0.4,  # 0.6-1.0 intensity
+                    'movement_speed': 1.0 + np.random.random() * 2.0,  # 1-3 pixels/sec
+                    'direction': 1 if np.random.random() < 0.5 else -1  # Random direction
+                })
+            
+            # Create foliage elements
+            instate['foliage'][strip_id] = []
+            num_leaves = max(3, strip_length // 15)  # About 1 leaf per 15 pixels
+            
+            for _ in range(num_leaves):
+                pos = np.random.randint(0, strip_length)
+                size = 5 + np.random.randint(0, 10)  # 5-15 pixels
+                
+                instate['foliage'][strip_id].append({
+                    'position': pos,
+                    'size': size,
+                    'color': 'leaf_green_light' if np.random.random() < 0.6 else 'leaf_green_dark',
+                    'sway_amplitude': 1.0 + np.random.random() * 2.0,  # 1-3 pixels
+                    'sway_frequency': 0.2 + np.random.random() * 0.4,  # 0.2-0.6 Hz
+                    'sway_offset': np.random.random() * 2 * np.pi  # Random phase
+                })
+            
+            # Create sunflowers
+            instate['sunflowers'][strip_id] = []
+            num_flowers = max(1, strip_length // 40)  # About 1 flower per 40 pixels
+            
+            for _ in range(num_flowers):
+                pos = np.random.randint(0, strip_length)
+                size = 8 + np.random.randint(0, 7)  # 8-15 pixels
+                
+                instate['sunflowers'][strip_id].append({
+                    'position': pos,
+                    'size': size,
+                    'rotate_speed': 0.1 + np.random.random() * 0.2,  # 0.1-0.3 radians/sec
+                    'rotation': np.random.random() * 2 * np.pi,  # Random initial rotation
+                    'sway_amplitude': 0.5 + np.random.random() * 1.5,  # 0.5-2.0 pixels
+                    'sway_frequency': 0.1 + np.random.random() * 0.3,  # 0.1-0.4 Hz
+                    'sway_offset': np.random.random() * 2 * np.pi  # Random phase
+                })
+            
+            # Create water ripples for base strips
+            instate['water_ripples'][strip_id] = []
+            num_ripples = max(2, strip_length // 25)  # About 1 ripple per 25 pixels
+            
+            for _ in range(num_ripples):
+                pos = np.random.randint(0, strip_length)
+                wavelength = 15 + np.random.randint(0, 20)  # 15-35 pixels
+                
+                instate['water_ripples'][strip_id].append({
+                    'position': pos,
+                    'wavelength': wavelength,
+                    'amplitude': 0.2 + np.random.random() * 0.3,  # 0.2-0.5 intensity variation
+                    'speed': 5.0 + np.random.random() * 10.0,  # 5-15 pixels/sec
+                    'direction': 1 if np.random.random() < 0.5 else -1  # Random direction
+                })
+            
+            # Initialize brain pulse state
+            if 'brain' in strip_groups:
+                instate['brain_pulse'][strip_id] = {
+                    'phase': np.random.random(),  # Random initial phase
+                    'flash_active': False,
+                    'flash_intensity': 0.0,
+                    'flash_decay': 5.0  # Flash decay rate
+                }
+        
+        # Determine strip type for customized effects
+        is_base = 'base' in strip_groups
+        is_brain = 'brain' in strip_groups
+        
+        # Create position array for the whole strip once
+        positions = np.arange(strip_length)
+        
+        # Start with a base color depending on strip type
+        # Start with a base color depending on strip type
+        if is_base:
+            # Light blue base for water effect
+            h, s, v = instate['colors']['water_blue']
+            r, g, b = hsv_to_rgb(h, s, v * 0.7)  # Slightly dimmed
+            buffer[:] = [r, g, b, 0.5]
+        elif is_brain:
+            # Darker base for brain to allow pulses to stand out
+            buffer[:] = [0.1, 0.1, 0.05, 0.1]
+        else:
+            # Sky blue base for other strips - brighter, more saturated sky blue
+            h, s, v = instate['colors']['sky_blue']
+            # Increase saturation and brightness for more vibrant sky blue
+            s = min(1.0, s * 1.2)  # More saturated
+            v = 0.9  # Brighter
+            r, g, b = hsv_to_rgb(h, s, v)
+            buffer[:] = [r, g, b, 0.5]  # Increased alpha for more visibility
+
+            
+        # Apply different effects based on strip type
+        if is_base:
+            # Water ripples for base strips - vectorized implementation
+            
+            # Initialize arrays for ripple and caustic effects
+            ripple_effect = np.zeros(strip_length)
+            
+            # Update and apply all ripples
+            for ripple in instate['water_ripples'][strip_id]:
+                # Update ripple position
+                ripple['position'] += ripple['speed'] * ripple['direction'] * delta_time
+                ripple['position'] %= strip_length
+                
+                # Create distance array (accounting for wrapping)
+                direct_dist = np.abs(positions - ripple['position'])
+                wrapped_dist = strip_length - direct_dist
+                distance = np.minimum(direct_dist, wrapped_dist)
+                
+                # Calculate ripple effect based on sine wave (vectorized)
+                ripple_phase = distance / ripple['wavelength'] * 2 * np.pi
+                ripple_effect += ripple['amplitude'] * np.sin(ripple_phase + current_time * 2.0)
+            
+            # Add underwater caustics effect (light patterns) - vectorized
+            caustic_effect = 0.15 * np.sin(positions * 0.2 + current_time * 1.5) * np.cos(positions * 0.1 + current_time)
+            
+            # Combine effects
+            total_effect = ripple_effect + caustic_effect
+            
+            # Extract current buffer values
+            curr_r = buffer[:, 0]
+            curr_g = buffer[:, 1]
+            curr_b = buffer[:, 2]
+            curr_a = buffer[:, 3]
+            
+            # Create masks for bright and dark areas
+            bright_mask = total_effect > 0
+            dark_mask = ~bright_mask
+            
+            # Apply effects to bright areas (vectorized)
+            if np.any(bright_mask):
+                # Shift toward white-blue for bright spots
+                new_r = curr_r.copy()
+                new_g = curr_g.copy()
+                new_b = curr_b.copy()
+                
+                new_r[bright_mask] += total_effect[bright_mask] * 0.4
+                new_g[bright_mask] += total_effect[bright_mask] * 0.5
+                new_b[bright_mask] += total_effect[bright_mask] * 0.6
+            
+            # Apply effects to dark areas (vectorized)
+            if np.any(dark_mask):
+                # Shift toward deeper blue for darker spots
+                new_r[dark_mask] = np.maximum(0, curr_r[dark_mask] + total_effect[dark_mask] * 0.3)
+                new_g[dark_mask] = np.maximum(0, curr_g[dark_mask] + total_effect[dark_mask] * 0.4)
+                new_b[dark_mask] = np.maximum(0, curr_b[dark_mask] + total_effect[dark_mask] * 0.3)
+            
+            # Ensure all values are in valid range (vectorized)
+            new_r = np.clip(new_r, 0.0, 1.0)
+            new_g = np.clip(new_g, 0.0, 1.0)
+            new_b = np.clip(new_b, 0.0, 1.0)
+            
+            # Update buffer (vectorized)
+            buffer[:, 0] = new_r
+            buffer[:, 1] = new_g
+            buffer[:, 2] = new_b
+            
+        elif is_brain:
+            # Brain pulse effect with gold and yellow - vectorized implementation
+            if strip_id in instate['brain_pulse']:
+                pulse_state = instate['brain_pulse'][strip_id]
+                
+                # Update pulse phase
+                pulse_state['phase'] += instate['brain_pulse_rate'] * delta_time
+                pulse_state['phase'] %= 1.0
+                
+                # Calculate pulse intensity (0.0-1.0)
+                phase = pulse_state['phase']
+                if phase < 0.3:
+                    # Rising phase
+                    pulse_intensity = phase / 0.3
+                elif phase < 0.5:
+                    # Peak phase
+                    pulse_intensity = 1.0
+                else:
+                    # Falling phase
+                    pulse_intensity = 1.0 - ((phase - 0.5) / 0.5)
+                
+                # Handle flash effect
+                if should_flash and not pulse_state['flash_active']:
+                    pulse_state['flash_active'] = True
+                    pulse_state['flash_intensity'] = 1.0
+                
+                if pulse_state['flash_active']:
+                    # Update flash intensity
+                    pulse_state['flash_intensity'] -= pulse_state['flash_decay'] * delta_time
+                    
+                    if pulse_state['flash_intensity'] <= 0:
+                        pulse_state['flash_active'] = False
+                        pulse_state['flash_intensity'] = 0.0
+                
+                # Combine regular pulse with flash
+                combined_intensity = max(pulse_intensity, pulse_state['flash_intensity'])
+                
+                # Create spatial variation (vectorized)
+                position_factor = 0.8 + 0.2 * np.sin(positions * 0.2 + current_time)
+                
+                # Create alternating color mask
+                alternate_mask = (positions % 2 == 0)
+                
+                # Create color arrays
+                h_values = np.zeros(strip_length)
+                s_values = np.zeros(strip_length)
+                v_values = np.zeros(strip_length)
+                
+                # Set colors based on alternating pattern
+                h_golden, s_golden, v_golden = instate['colors']['golden_sun']
+                h_sunshine, s_sunshine, v_sunshine = instate['colors']['sunshine_yellow']
+                
+                # Apply alternating colors (vectorized)
+                h_values[alternate_mask] = h_golden
+                s_values[alternate_mask] = s_golden
+                v_values[alternate_mask] = v_golden
+                
+                h_values[~alternate_mask] = h_sunshine
+                s_values[~alternate_mask] = s_sunshine
+                v_values[~alternate_mask] = v_sunshine
+                
+                # If flash is active, use golden color everywhere
+                if pulse_state['flash_active']:
+                    h_values[:] = h_golden
+                    s_values[:] = s_golden
+                    v_values[:] = v_golden
+                
+                # Adjust brightness based on pulse (vectorized)
+                v_adjusted = v_values * (0.3 + 0.7 * combined_intensity * position_factor)
+                
+                # Convert to RGB
+                # Unfortunately we need to convert each pixel individually
+                r_values = np.zeros(strip_length)
+                g_values = np.zeros(strip_length)
+                b_values = np.zeros(strip_length)
+                
+                for i in range(strip_length):
+                    r, g, b = hsv_to_rgb(h_values[i], s_values[i], v_adjusted[i])
+                    r_values[i] = r
+                    g_values[i] = g
+                    b_values[i] = b
+                
+                # Set alpha based on intensity (vectorized)
+                alpha_values = 0.2 + 0.8 * combined_intensity * position_factor
+                
+                # Update buffer (vectorized)
+                buffer[:, 0] = r_values
+                buffer[:, 1] = g_values
+                buffer[:, 2] = b_values
+                buffer[:, 3] = alpha_values
+            
+        else:
+            # Default effect: Sunlight through foliage - vectorized implementation
+            
+            # Initialize buffer to capture foliage
+            foliage_r = np.zeros(strip_length)
+            foliage_g = np.zeros(strip_length)
+            foliage_b = np.zeros(strip_length)
+            foliage_a = np.zeros(strip_length)
+            
+            # Draw foliage first as background
+            for leaf in instate['foliage'][strip_id]:
+                # Calculate swaying motion
+                sway = leaf['sway_amplitude'] * np.sin(current_time * leaf['sway_frequency'] * 2 * np.pi + 
+                                                      leaf['sway_offset'])
+                
+                # Calculate actual position with sway
+                actual_pos = (leaf['position'] + sway) % strip_length
+                center = int(actual_pos)
+                size = leaf['size']
+                
+                # Create range of positions for this leaf
+                leaf_range = np.arange(center - size, center + size + 1) % strip_length
+                
+                # Calculate distances from center (normalized)
+                rel_positions = np.arange(-size, size + 1)
+                distances = np.abs(rel_positions) / size
+                
+                # Calculate leaf shape factor - more oval than circular (vectorized)
+                valid_mask = distances <= 1.0
+                shape_factors = np.zeros_like(distances)
+                shape_factors[valid_mask] = 1.0 - distances[valid_mask]**1.5
+                
+                # Calculate final intensities
+                intensities = shape_factors * 0.7  # Leaves are partially transparent
+                
+                # Add some texture/variation to the leaf (vectorized)
+                texture = 0.15 * np.sin(rel_positions * 0.8 + leaf['position'] * 0.3)
+                
+                # Get leaf color
+                h, s, v = instate['colors'][leaf['color']]
+                
+                # Apply texture to color
+                v_adjusted = np.clip(v * (1.0 + texture), 0.0, 1.0)
+                
+                # Convert to RGB (need to do each pixel individually due to hsv_to_rgb limitations)
+                for i, pos in enumerate(leaf_range):
+                    if intensities[i] > 0.1:  # Skip very low intensity pixels
+                        r, g, b = hsv_to_rgb(h, s, v_adjusted[i])
+                        
+                        # Blend with existing foliage buffer using maximum
+                        if intensities[i] > foliage_a[pos]:
+                            foliage_r[pos] = r
+                            foliage_g[pos] = g
+                            foliage_b[pos] = b
+                            foliage_a[pos] = intensities[i]
+            
+            # Apply foliage to buffer where alpha is significant
+            foliage_mask = foliage_a > 0.1
+            if np.any(foliage_mask):
+                idx = np.where(foliage_mask)[0]
+                for i in idx:
+                    # Blend with existing buffer
+                    intensity = foliage_a[i]
+                    curr_r, curr_g, curr_b, curr_a = buffer[i]
+                    
+                    buffer[i] = [
+                        foliage_r[i] * intensity + curr_r * (1 - intensity),
+                        foliage_g[i] * intensity + curr_g * (1 - intensity),
+                        foliage_b[i] * intensity + curr_b * (1 - intensity),
+                        max(curr_a, intensity)
+                    ]
+            
+            # Draw sunflowers
+            for flower in instate['sunflowers'][strip_id]:
+                # Update rotation
+                flower['rotation'] += flower['rotate_speed'] * delta_time
+                
+                # Calculate swaying motion
+                sway = flower['sway_amplitude'] * np.sin(current_time * flower['sway_frequency'] * 2 * np.pi + 
+                                                        flower['sway_offset'])
+                
+                # Calculate actual position with sway
+                actual_pos = (flower['position'] + sway) % strip_length
+                center = int(actual_pos)
+                
+                # Draw the sunflower petals
+                num_petals = 8
+                
+                # Get petal color
+                h, s, v = instate['colors']['sunflower_petal']
+                r_petal, g_petal, b_petal = hsv_to_rgb(h, s, v)
+                
+                for petal in range(num_petals):
+                    # Calculate petal direction
+                    angle = flower['rotation'] + petal * (2 * np.pi / num_petals)
+                    
+                    # Calculate petal positions (extending from center)
+                    petal_length = int(flower['size'] * 0.8)
+                    petal_dir_x = np.cos(angle)
+                    
+                    # Calculate all positions for this petal at once
+                    lengths = np.arange(petal_length)
+                    petal_positions = (center + np.round(petal_dir_x * lengths)).astype(int) % strip_length
+                    
+                    # Set all petal pixels at once
+                    buffer[petal_positions] = [r_petal, g_petal, b_petal, 0.8]
+                
+                # Draw center
+                center_size = max(1, int(flower['size'] * 0.3))
+                
+                # Create range of positions for center
+                center_range = np.arange(center - center_size, center + center_size + 1) % strip_length
+                
+                # Calculate distances from center (normalized)
+                rel_positions = np.arange(-center_size, center_size + 1)
+                distances = np.abs(rel_positions) / center_size
+                
+                # Calculate intensity based on distance (vectorized)
+                valid_mask = distances <= 1.0
+                intensities = np.zeros_like(distances)
+                intensities[valid_mask] = 1.0 - distances[valid_mask]**2
+                
+                # Add texture to center (vectorized)
+                texture = 0.1 * np.sin(rel_positions * 2.0 + current_time)
+                
+                # Get center color
+                h, s, v = instate['colors']['sunflower_center']
+                
+                # Apply texture to color (vectorized)
+                v_adjusted = np.clip(v * (1.0 + texture), 0.0, 1.0)
+                
+                # Convert to RGB and apply to buffer
+                for i, pos in enumerate(center_range):
+                    if valid_mask[i]:
+                        r, g, b = hsv_to_rgb(h, s, v_adjusted[i])
+                        buffer[pos] = [r, g, b, 0.9]
+            
+            # Draw sun rays last (on top) - vectorized where possible
+            for ray in instate['sun_rays'][strip_id]:
+                # Update position
+                ray['position'] += ray['movement_speed'] * ray['direction'] * delta_time
+                ray['position'] %= strip_length
+                
+                # Draw the ray
+                center = int(ray['position'])
+                width = ray['width']
+                
+                # Create range of positions for this ray
+                ray_range = np.arange(center - width, center + width + 1) % strip_length
+                
+                # Calculate distances from center (normalized)
+                rel_positions = np.arange(-width, width + 1)
+                distances = np.abs(rel_positions) / width
+                
+                # Calculate soft edge profile (vectorized)
+                valid_mask = distances <= 1.0
+                edge_profiles = np.zeros_like(distances)
+                edge_profiles[valid_mask] = (1.0 - distances[valid_mask]**2) * ray['intensity'] * sun_factor
+                
+                # Add shimmer effect (vectorized)
+                shimmer = 0.2 * np.sin(current_time * 5.0 + ray_range * 0.3)
+                
+                # Get sunshine color
+                h, s, v = instate['colors']['sunshine_yellow']
+                
+                # Apply to buffer
+                for i, pos in enumerate(ray_range):
+                    if edge_profiles[i] > 0.05:  # Skip very low intensity pixels
+                        # Less saturated for sun rays
+                        r, g, b = hsv_to_rgb(h, s * 0.7, v * (1.0 + shimmer[i]))
+                        
+                        # Get current pixel values
+                        curr_r, curr_g, curr_b, curr_a = buffer[pos]
+                        
+                        # Blend additively for light rays
+                        edge_profile = edge_profiles[i]
+                        buffer[pos] = [
+                            min(1.0, curr_r + r * edge_profile * 0.7),
+                            min(1.0, curr_g + g * edge_profile * 0.7),
+                            min(1.0, curr_b + b * edge_profile * 0.7),
+                            max(curr_a, edge_profile * 0.7)
+                        ]
