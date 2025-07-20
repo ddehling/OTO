@@ -49,17 +49,17 @@ class InputPanel(QMainWindow):
             slider = QSlider(Qt.Horizontal)
             slider.setMinimum(0)
             slider.setMaximum(100)
-            slider.setValue(50)
+            slider.setValue(0)
             slider.setTickPosition(QSlider.TicksBelow)
             slider.setTickInterval(10)
             
             # Create value label
-            value_label = QLabel("50")
+            value_label = QLabel("0")
             value_label.setMinimumWidth(30)
             
             # Connect slider value change to update function
             slider_id = name.lower().replace(' ', '_')
-            self.values[slider_id] = 50
+            self.values[slider_id] = 0
             slider.valueChanged.connect(lambda val, s_id=slider_id, vl=value_label: self.update_slider_value(val, s_id, vl))
             
             row_layout.addWidget(slider)
