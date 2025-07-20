@@ -2543,3 +2543,225 @@ def draw_stripe(buffer, strip_length, stripe, alpha):
         new_a = max(curr_a, a)
         
         buffer[pixel_pos] = [new_r, new_g, new_b, new_a]
+
+# ... existing code ...
+
+def OTO_rage_lightning(instate, outstate):
+    """
+    Generator function that creates a passionate rage-themed pattern across all strips.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_rage'] value
+    2. Fast blinking lightning effects in yellows, blues, and whites
+    3. High-speed component causing entire strips to flash with noisy variations
+    4. Rapid changes in which strips are activated to create chaotic, angry pattern
+    5. Consistent low-level noise across all pixels for added intensity
+    6. Intense flashing reminiscent of electrical storms and passionate rage
+    """
+    name = 'rage_lightning'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['flash_timer'] = 0.0       # Timer for rapid flashes
+        instate['strip_change_timer'] = 0.0  # Timer for changing active strips
+        instate['active_strips'] = []      # Currently active strips
+        instate['flash_state'] = False     # Current flash state (on/off)
+        instate['last_flash_time'] = 0.0   # Time of last flash change
+        
+        # Color palette (HSV values)
+        instate['colors'] = {
+            'electric_blue': [0.6, 0.85, 1.0],    # Intense blue
+            'bright_yellow': [0.15, 0.8, 1.0],    # Bright yellow
+            'white_hot': [0.0, 0.0, 1.0],         # Pure white
+            'light_blue': [0.55, 0.7, 1.0],       # Light blue
+            'pale_yellow': [0.13, 0.5, 1.0]       # Pale yellow
+        }
+        
+        # Timing parameters
+        instate['min_flash_time'] = 0.1    # Minimum time between flashes (seconds)
+        instate['max_flash_time'] = 0.4    # Maximum time between flashes (seconds)
+        instate['strip_change_time'] = 0.3  # Time between changing active strips (seconds)
+        instate['active_strip_percent'] = 0.3  # Percentage of strips active at once
+        
+        # Noise parameters
+        instate['base_noise_min'] = 0.2    # Minimum noise intensity (20%)
+        instate['base_noise_max'] = 0.4    # Maximum noise intensity (40%)
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get rage level from outstate (default to 0)
+    rage_level = outstate.get('control_rage', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = rage_level
+    
+    # Skip rendering if alpha is too low
+    if rage_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * rage_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    current_time = outstate['current_time']
+    
+    # Update flash timer - controls rapid flash component
+    instate['flash_timer'] += delta_time
+    
+    # Determine if it's time for a new flash
+    time_since_last_flash = current_time - instate['last_flash_time']
+    flash_interval = instate['min_flash_time'] + np.random.random() * (instate['max_flash_time'] - instate['min_flash_time'])
+    
+    # Higher rage intensifies flashing (shorter intervals)
+    flash_interval = flash_interval * (1.0 - rage_level * 0.5)
+    
+    if time_since_last_flash >= flash_interval:
+        # Time for a new flash state
+        instate['last_flash_time'] = current_time
+        instate['flash_state'] = not instate['flash_state']
+    
+    # Update strip change timer - controls which strips are active
+    instate['strip_change_timer'] += delta_time
+    
+    # Check if it's time to change active strips
+    strip_change_time = instate['strip_change_time'] * (1.0 - rage_level * 0.5)  # Faster changes with higher rage
+    
+    if instate['strip_change_timer'] >= strip_change_time:
+        instate['strip_change_timer'] = 0.0
+        
+        # Select new active strips
+        all_strips = list(strip_manager.strips.keys())
+        if all_strips:
+            # Calculate how many strips to activate
+            active_percent = instate['active_strip_percent'] * (1.0 + rage_level * 0.5)  # More active strips with higher rage
+            active_percent = min(0.8, active_percent)  # Cap at 80%
+            
+            num_to_select = max(1, int(len(all_strips) * active_percent))
+            instate['active_strips'] = np.random.choice(all_strips, num_to_select, replace=False)
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Process each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip_length = len(buffer)
+        
+        # Determine if this is an active strip
+        is_active = strip_id in instate['active_strips']
+        
+        # Start with a dark base - slight blue tint
+        buffer[:] = [0.0, 0.0, 0.1, 0.1]  # Very dim blue base
+        
+        if is_active:
+            # This strip is active
+            
+            if instate['flash_state']:
+                # Flash is on - light up the entire strip with noise
+                
+                # Choose a base color for this strip
+                color_name = np.random.choice(list(instate['colors'].keys()))
+                h, s, v = instate['colors'][color_name]
+                
+                # Generate base RGB values
+                r, g, b = hsv_to_rgb(h, s, v)
+                
+                # Create noise variation across the strip
+                for i in range(strip_length):
+                    # Add noise to color (more noise with higher rage)
+                    noise_amount = 0.2 + rage_level * 0.3
+                    r_noise = r * (1.0 - noise_amount + np.random.random() * noise_amount * 2)
+                    g_noise = g * (1.0 - noise_amount + np.random.random() * noise_amount * 2)
+                    b_noise = b * (1.0 - noise_amount + np.random.random() * noise_amount * 2)
+                    
+                    # Ensure values are in valid range
+                    r_noise = max(0.0, min(1.0, r_noise))
+                    g_noise = max(0.0, min(1.0, g_noise))
+                    b_noise = max(0.0, min(1.0, b_noise))
+                    
+                    # Set alpha - also with some variation
+                    alpha = 0.7 + np.random.random() * 0.3
+                    
+                    # Add to buffer
+                    buffer[i] = [r_noise, g_noise, b_noise, alpha]
+                
+                # Add some brighter spots (more with higher rage)
+                num_bright_spots = int(strip_length * (0.1 + rage_level * 0.2))
+                for _ in range(num_bright_spots):
+                    pos = np.random.randint(0, strip_length)
+                    
+                    # Brighter version of the base color
+                    br, bg, bb = hsv_to_rgb(h, s * 0.7, min(1.0, v * 1.3))  # Less saturated, brighter
+                    
+                    buffer[pos] = [br, bg, bb, 1.0]
+            else:
+                # Flash is off but strip is active - add subtle ambient glow
+                for i in range(strip_length):
+                    # Add small ambient effect
+                    flicker = 0.05 + 0.05 * np.sin(current_time * 10 + i * 0.1)
+                    
+                    # Use blue for ambient glow
+                    h, s, v = instate['colors']['electric_blue']
+                    r, g, b = hsv_to_rgb(h, s * 0.7, v * 0.4)
+                    
+                    # Set pixel with low intensity but higher than non-active strips
+                    buffer[i] = [r, g, b, 0.2 + flicker]
+        else:
+            # Non-active strip - very dim ambient only
+            # But occasionally (based on rage) flash briefly
+            random_flash = np.random.random() < (0.01 * rage_level)
+            
+            if random_flash:
+                # Brief random flash on non-active strip
+                color_name = np.random.choice(['electric_blue', 'light_blue'])
+                h, s, v = instate['colors'][color_name]
+                r, g, b = hsv_to_rgb(h, s, v)
+                
+                # Lower intensity than active strips
+                for i in range(strip_length):
+                    noise = 0.7 + np.random.random() * 0.3
+                    buffer[i] = [r * noise, g * noise, b * noise, 0.4]
+        
+        # Apply additional base noise to EVERY pixel on EVERY strip
+        # This adds the consistent 20-40% intensity noise across all pixels
+        for i in range(strip_length):
+            # Get current pixel values
+            curr_r, curr_g, curr_b, curr_a = buffer[i]
+            
+            # Generate random color for noise
+            noise_color = np.random.choice(list(instate['colors'].keys()))
+            h, s, v = instate['colors'][noise_color]
+            noise_r, noise_g, noise_b = hsv_to_rgb(h, s, v)
+            
+            # Calculate noise intensity (20-40% range)
+            noise_intensity = instate['base_noise_min'] + np.random.random() * (instate['base_noise_max'] - instate['base_noise_min'])
+            
+            # Increase noise with rage level
+            noise_intensity *= (1.0 + rage_level * 0.5)
+            noise_intensity = min(0.6, noise_intensity)  # Cap at 60% for high rage
+            
+            # Apply noise with additive blending
+            new_r = min(1.0, curr_r + (noise_r * noise_intensity))
+            new_g = min(1.0, curr_g + (noise_g * noise_intensity))
+            new_b = min(1.0, curr_b + (noise_b * noise_intensity))
+            new_a = max(curr_a, noise_intensity)
+            
+            buffer[i] = [new_r, new_g, new_b, new_a]
