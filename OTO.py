@@ -3,6 +3,7 @@ import time
 from corefunctions.Events import EventScheduler
 from sceneutils.OTO_dev import *  # noqa: F403
 from sceneutils.OTO_inactive import *  # noqa: F403
+from sceneutils.OTO_emotions import *  # noqa: F403
 from corefunctions.input_panel import InputPanel 
  # noqa: F403
 #
@@ -131,6 +132,7 @@ if __name__ == "__main__":
     env_system.scheduler.schedule_event(00, 8000000, OTO_sunrise_joy) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_sad_theme) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_angry_theme) # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_curious_playful) # noqa: F405
     lasttime = time.time()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
@@ -151,3 +153,4 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Done!")
+
