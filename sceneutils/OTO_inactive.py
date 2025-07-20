@@ -300,3 +300,69 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                         'width': 5 + int(np.random.random() * 10),  # 5-15 pixels wide
                         'hue': np.random.random()  # Random color
                     })
+
+
+
+# ... existing code ...
+
+def OTO_generic_pattern(instate, outstate):
+    """
+    Generic pattern generator template with controllable alpha level.
+    
+    This function provides a starting point for creating new patterns
+    with proper initialization, cleanup, and alpha control.
+    """
+    name = 'generic_pattern'
+    buffers = outstate['buffers']
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['param1'] = 5.0  # Example parameter
+        instate['param2'] = 0.0  # Example state variable
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get alpha level from outstate or use default 1.0
+    alpha = outstate.get('generic', 1.0)
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = alpha
+    
+    # Skip rendering if alpha is too low
+    if alpha < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        # Fade out over the last 10 seconds
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * alpha
+        
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Update state variables
+    instate['param2'] += delta_time * 0.5  # Example state update
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Render pattern to each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Example rendering code
+        for i in range(len(buffer)):
+            # Calculate pixel values based on position and time
+            intensity = 0.5 + 0.5 * np.sin((i / 10.0) + instate['param2'])
+            
+            # Set pixel color (RGBA format)
+            buffer[i] = [intensity, intensity * 0.8, intensity * 0.5, intensity]
