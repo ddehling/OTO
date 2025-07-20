@@ -2765,3 +2765,503 @@ def OTO_rage_lightning(instate, outstate):
             new_a = max(curr_a, noise_intensity)
             
             buffer[i] = [new_r, new_g, new_b, new_a]
+            
+def OTO_contemplative_cosmic(instate, outstate):
+    """
+    Generator function that creates a contemplative cosmic-themed pattern.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_contemplative'] value
+    2. Prominent, flowing nebular color fields (blues, greens, oranges) that blend and smear
+    3. Slow-moving field of blinking stars (white)
+    4. Green moving splotches resembling cosmic gas clouds
+    5. Green/yellow blinking fireflies that move around
+    
+    The overall effect is a peaceful cosmic environment that evokes 
+    contemplation and wonder with vivid, dynamic color flows.
+    """
+    name = 'contemplative_cosmic'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['stars'] = {}           # Track stars across strips
+        instate['splotches'] = {}       # Track green splotches
+        instate['nebulae'] = {}         # Track large nebular regions
+        instate['color_flows'] = {}     # Track flowing color smears
+        instate['fireflies'] = {}       # Track moving fireflies
+        
+        # Color palette (HSV values)
+        instate['colors'] = {
+            'white_star': [0.0, 0.0, 1.0],          # Pure white
+            'blue_deep': [0.6, 0.8, 0.6],           # Deep blue
+            'blue_light': [0.55, 0.6, 0.9],         # Light blue
+            'orange_nebula': [0.08, 0.7, 0.8],      # Orange nebula
+            'orange_deep': [0.05, 0.85, 0.7],       # Deep orange
+            'green_cosmic': [0.35, 0.8, 0.7],       # Cosmic green
+            'green_deep': [0.3, 0.9, 0.6],          # Deep green
+            'yellow_glow': [0.15, 0.8, 0.9],        # Yellow glow
+            'green_yellow': [0.2, 0.85, 0.8],       # Green-yellow
+            'purple_cosmic': [0.75, 0.7, 0.6],      # Cosmic purple
+            'teal_cosmic': [0.45, 0.7, 0.7]         # Cosmic teal
+        }
+        
+        # Global parameters for nebular flows
+        instate['flow_speed_base'] = 2.0      # Base speed for color flows
+        instate['flow_update_timer'] = 0.0    # Timer for updating global flow parameters
+        instate['global_flow_direction'] = 1  # Global direction that can change occasionally
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get contemplative level from outstate (default to 0)
+    contemplative_level = outstate.get('control_contemplative', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = contemplative_level
+    
+    # Skip rendering if alpha is too low
+    if contemplative_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * contemplative_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    current_time = outstate['current_time']
+    
+    # Update global flow parameters
+    instate['flow_update_timer'] += delta_time
+    if instate['flow_update_timer'] > 15.0:  # Every 15 seconds, consider changing global flow direction
+        instate['flow_update_timer'] = 0.0
+        if np.random.random() < 0.4:  # 40% chance to reverse global flow
+            instate['global_flow_direction'] *= -1
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Process each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        
+        # Start with a dark base - very deep blue
+        buffer[:] = [0.0, 0.0, 0.1, 0.2]  # Very dim blue base
+        
+        # Initialize elements for this strip if not already done
+        if strip_id not in instate['stars']:
+            # Create stars
+            instate['stars'][strip_id] = []
+            num_stars = max(3, strip_length // 5)  # Roughly 1 star per 10 pixels
+            
+            for _ in range(num_stars):
+                pos = np.random.randint(0, strip_length)
+                instate['stars'][strip_id].append({
+                    'position': pos,
+                    'brightness': 0.3 + np.random.random() * 0.7,  # 0.3-1.0 brightness
+                    'blink_rate': 0.2 + np.random.random() * 1.0,  # 0.2-1.2 Hz
+                    'blink_offset': np.random.random() * 2 * np.pi,  # Random phase
+                    'movement_speed': 0.5 + np.random.random() * 1.5,  # 0.5-2.0 pixels per second (slow)
+                    'direction': 1 if np.random.random() < 0.5 else -1  # Random direction
+                })
+            
+            # Create green splotches
+            instate['splotches'][strip_id] = []
+            num_splotches = max(1, strip_length // 40)  # Fewer splotches, 1 per ~40 pixels
+            
+            for _ in range(num_splotches):
+                pos = np.random.randint(0, strip_length)
+                instate['splotches'][strip_id].append({
+                    'position': pos,
+                    'size': 5 + np.random.randint(0, 10),  # 5-15 pixels
+                    'speed': 1.0 + np.random.random() * 2.0,  # 1-3 pixels per second (slow)
+                    'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
+                    'color': np.random.choice(['green_cosmic', 'green_deep']),  # Random green shade
+                    'intensity': 0.5 + np.random.random() * 0.5,  # 0.5-1.0 intensity
+                    'pulse_rate': 0.1 + np.random.random() * 0.3,  # 0.1-0.4 Hz (slow pulse)
+                    'pulse_offset': np.random.random() * 2 * np.pi  # Random phase
+                })
+            
+            # Create large nebulae - main colored regions
+            instate['nebulae'][strip_id] = []
+            num_nebulae = max(2, strip_length // 30)  # More nebulae: 1 per ~30 pixels
+            
+            for _ in range(num_nebulae):
+                pos = np.random.randint(0, strip_length)
+                color = np.random.choice(['blue_deep', 'blue_light', 'orange_nebula', 
+                                         'green_cosmic', 'purple_cosmic', 'teal_cosmic'])
+                
+                instate['nebulae'][strip_id].append({
+                    'position': pos,
+                    'size': 20 + np.random.randint(0, 30),  # 20-50 pixels (much larger)
+                    'speed': 0.8 + np.random.random() * 1.2,  # 0.8-2.0 pixels per second
+                    'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
+                    'color': color,
+                    'intensity': 0.5 + np.random.random() * 0.5,  # 0.5-1.0 intensity (much brighter)
+                    'pulse_rate': 0.05 + np.random.random() * 0.15,  # 0.05-0.2 Hz (very slow pulse)
+                    'pulse_offset': np.random.random() * 2 * np.pi  # Random phase
+                })
+            
+            # Create color flows - dynamic smearing nebular effects
+            instate['color_flows'][strip_id] = []
+            
+            # Create multiple color flow layers with different characteristics
+            num_flow_layers = 4 + np.random.randint(0, 3)  # 4-6 layers (more layers)
+            
+            for _ in range(num_flow_layers):
+                # Choose complementary colors for interesting blends
+                color_pairs = [
+                    ('blue_deep', 'orange_nebula'),
+                    ('blue_light', 'orange_deep'),
+                    ('green_cosmic', 'purple_cosmic'),
+                    ('green_deep', 'blue_deep'),
+                    ('yellow_glow', 'blue_light'),
+                    ('teal_cosmic', 'orange_deep'),
+                    ('green_yellow', 'purple_cosmic')
+                ]
+                color_pair = color_pairs[np.random.randint(0, len(color_pairs))]
+                
+                # Create a flow layer
+                instate['color_flows'][strip_id].append({
+                    'color1': color_pair[0],
+                    'color2': color_pair[1],
+                    'offset': np.random.random() * strip_length,  # Random starting position
+                    'scale': 15 + np.random.random() * 45,  # 15-60 pixel scale (wavelength)
+                    'speed': instate['flow_speed_base'] * (0.5 + np.random.random()),  # Varied speeds
+                    'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
+                    'amplitude': 0.4 + np.random.random() * 0.6,  # 0.4-1.0 intensity (much stronger)
+                    'phase_shift': np.random.random() * 2 * np.pi,  # Random phase
+                    'drift_rate': 0.1 + np.random.random() * 0.3,  # 0.1-0.4 units per second
+                    'distortion': 0.5 + np.random.random() * 1.5  # 0.5-2.0 distortion factor
+                })
+            
+            # Create fireflies
+            instate['fireflies'][strip_id] = []
+            num_fireflies = max(2, strip_length // 15)  # 1 per ~30 pixels
+            
+            for _ in range(num_fireflies):
+                pos = np.random.randint(0, strip_length)
+                color = np.random.choice(['green_yellow', 'yellow_glow'])
+                
+                instate['fireflies'][strip_id].append({
+                    'position': pos,
+                    'speed': 5.0 + np.random.random() * 15.0,  # 3-8 pixels per second (faster than other elements)
+                    'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
+                    'color': color,
+                    'blink_rate': 0.5 + np.random.random() * 1.5,  # 0.5-2.0 Hz
+                    'blink_offset': np.random.random() * 2 * np.pi,  # Random phase
+                    'blink_duration': 0.7 + np.random.random() * 0.8,  # 0.2-0.5 second blinks
+                    'last_direction_change': current_time,
+                    'direction_change_interval': 2.0 + np.random.random() * 4.0  # 2-6 seconds between direction changes
+                })
+        
+        # Set up a new array to collect all color contributions for proper blending
+        # Using numpy for efficient operations
+        r_values = np.zeros(strip_length)
+        g_values = np.zeros(strip_length)
+        b_values = np.zeros(strip_length)
+        a_values = np.zeros(strip_length)
+        
+        # Render large nebulae (largest, slowest color regions) first
+        for nebula in instate['nebulae'][strip_id]:
+            # Update position (slow movement)
+            nebula['position'] += nebula['speed'] * nebula['direction'] * delta_time
+            
+            # Handle wrapping
+            nebula['position'] %= strip_length
+            
+            # Calculate pulse effect (very slow and subtle)
+            pulse_factor = 0.8 + 0.2 * (0.5 + 0.5 * np.sin(current_time * nebula['pulse_rate'] * 2 * np.pi + nebula['pulse_offset']))
+            
+            # Calculate final intensity
+            intensity = nebula['intensity'] * pulse_factor
+            
+            # Get color
+            h, s, v = instate['colors'][nebula['color']]
+            
+            # Convert to RGB once for efficiency
+            base_r, base_g, base_b = hsv_to_rgb(h, s, v)
+            
+            # Draw the nebula with soft gradient
+            center = int(nebula['position'])
+            size = nebula['size']
+            
+            # Create pixel positions array with wrapping
+            positions = np.arange(center - size, center + size + 1) % strip_length
+            
+            # Calculate distances from center
+            distances = np.abs(np.arange(-size, size + 1)) / size
+            
+            # Create softened edge profile for organic look
+            # Use a power function for a more natural falloff
+            edge_profile = np.power(1.0 - distances, 2) * intensity
+            
+            # Add some noise for texture
+            noise = np.random.random(len(edge_profile)) * 0.15 - 0.075  # ±7.5% noise
+            edge_profile = np.clip(edge_profile + noise, 0, 1)
+            
+            # Apply to color arrays
+            for i, pos in enumerate(positions):
+                if edge_profile[i] > 0.01:  # Skip very low intensity
+                    r_values[pos] += base_r * edge_profile[i] * 0.7  # Reduce contribution to allow blending
+                    g_values[pos] += base_g * edge_profile[i] * 0.7
+                    b_values[pos] += base_b * edge_profile[i] * 0.7
+                    a_values[pos] += edge_profile[i] * 0.6  # More visible but still allows blending
+        
+        # Render dynamic color flows (nebular smearing)
+        for flow in instate['color_flows'][strip_id]:
+            # Update flow position
+            flow_direction = flow['direction'] * instate['global_flow_direction']  # Combine with global direction
+            flow['offset'] += flow['speed'] * flow_direction * delta_time
+            flow['phase_shift'] += flow['drift_rate'] * delta_time
+            
+            # Keep offset in range
+            flow['offset'] %= strip_length
+            
+            # Get the two colors
+            h1, s1, v1 = instate['colors'][flow['color1']]
+            h2, s2, v2 = instate['colors'][flow['color2']]
+            
+            # Create flow pattern across the strip - vectorized for efficiency
+            positions = np.arange(strip_length)
+            
+            # Calculate normalized positions in the flow
+            pos = (positions + flow['offset']) % strip_length
+            pos_norm = pos / flow['scale']
+            
+            # Add distortion for more organic appearance
+            distortion = np.sin(pos_norm * 0.5 + flow['phase_shift']) * flow['distortion']
+            
+            # Calculate main flow pattern
+            flow_values = 0.5 + 0.5 * np.sin(pos_norm * 2 * np.pi + flow['phase_shift'] + distortion)
+            
+            # Apply amplitude modulation
+            intensities = flow_values * flow['amplitude']
+            
+            # Create mask for pixels to update (where intensity is significant)
+            mask = intensities > 0.1
+            
+            if np.any(mask):
+                # Handle hue interpolation for wrapped color space
+                h_diff = h2 - h1
+                if abs(h_diff) > 0.5:
+                    if h1 > h2:
+                        h2 += 1.0
+                    else:
+                        h1 += 1.0
+                
+                # Work with the masked values for efficiency
+                flow_vals_masked = flow_values[mask]
+                
+                # Interpolate colors (vectorized)
+                h_values = (h1 * (1.0 - flow_vals_masked) + h2 * flow_vals_masked) % 1.0
+                s_values = s1 * (1.0 - flow_vals_masked) + s2 * flow_vals_masked
+                v_values = v1 * (1.0 - flow_vals_masked) + v2 * flow_vals_masked
+                
+                # Convert to RGB (need to do this per-pixel due to hsv_to_rgb limitations)
+                for i, idx in enumerate(positions[mask]):
+                    r, g, b = hsv_to_rgb(h_values[i], s_values[i], v_values[i])
+                    
+                    # Calculate intensity
+                    intensity = intensities[idx]
+                    
+                    # Add to color arrays with stronger contribution
+                    r_values[idx] += r * intensity * 0.8
+                    g_values[idx] += g * intensity * 0.8
+                    b_values[idx] += b * intensity * 0.8
+                    a_values[idx] += intensity * 0.7  # Stronger alpha
+        
+        # Apply combined nebular effects to buffer
+        for i in range(strip_length):
+            if a_values[i] > 0:
+                # Ensure values are in valid range
+                r = min(1.0, r_values[i])
+                g = min(1.0, g_values[i])
+                b = min(1.0, b_values[i])
+                a = min(0.45, a_values[i])  # Cap alpha to allow for stars and fireflies
+                
+                # Set buffer with nebular colors
+                buffer[i] = [r, g, b, a]
+        
+        # Update and render stars
+        for star in instate['stars'][strip_id]:
+            # Update position (slow movement)
+            star['position'] += star['movement_speed'] * star['direction'] * delta_time
+            
+            # Handle wrapping
+            star['position'] %= strip_length
+            
+            # Calculate blink effect
+            blink_factor = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(current_time * star['blink_rate'] * 2 * np.pi + star['blink_offset']))
+            
+            # Calculate final brightness
+            brightness = star['brightness'] * blink_factor
+            
+            # Draw the star
+            pos_int = int(star['position'])
+            
+            # Get base color (white)
+            h, s, v = instate['colors']['white_star']
+            r, g, b = hsv_to_rgb(h, s, v * brightness)
+            
+            # Set pixel with alpha based on brightness
+            alpha = 0.3 + 0.7 * brightness
+            
+            # Add to buffer with additive blending
+            curr_r, curr_g, curr_b, curr_a = buffer[pos_int]
+            buffer[pos_int] = [
+                max(curr_r, r),
+                max(curr_g, g),
+                max(curr_b, b),
+                max(curr_a, alpha)
+            ]
+            
+            # Add small glow around bright stars
+            if brightness > 0.7:
+                for offset in [-1, 1]:
+                    glow_pos = (pos_int + offset) % strip_length
+                    glow_alpha = alpha * 0.5  # Half the brightness
+                    
+                    curr_r, curr_g, curr_b, curr_a = buffer[glow_pos]
+                    buffer[glow_pos] = [
+                        max(curr_r, r * 0.5),
+                        max(curr_g, g * 0.5),
+                        max(curr_b, b * 0.5),
+                        max(curr_a, glow_alpha)
+                    ]
+        
+        # Update and render green splotches
+        for splotch in instate['splotches'][strip_id]:
+            # Update position
+            splotch['position'] += splotch['speed'] * splotch['direction'] * delta_time
+            
+            # Handle wrapping
+            splotch['position'] %= strip_length
+            
+            # Calculate pulse effect
+            pulse_factor = 0.7 + 0.3 * (0.5 + 0.5 * np.sin(current_time * splotch['pulse_rate'] * 2 * np.pi + splotch['pulse_offset']))
+            
+            # Calculate final intensity
+            intensity = splotch['intensity'] * pulse_factor
+            
+            # Draw the splotch as a gradient
+            center = int(splotch['position'])
+            size = splotch['size']
+            
+            # Get color
+            h, s, v = instate['colors'][splotch['color']]
+            
+            # Draw splotch with gradient falloff
+            for i in range(-size, size + 1):
+                pixel_pos = (center + i) % strip_length
+                
+                # Calculate distance from center (normalized)
+                dist = abs(i) / size
+                
+                # Skip if too far
+                if dist > 1.0:
+                    continue
+                
+                # Calculate intensity based on distance from center
+                pixel_intensity = intensity * (1.0 - dist**2)  # Quadratic falloff
+                
+                # Calculate color
+                r, g, b = hsv_to_rgb(h, s, v * pixel_intensity)
+                alpha = pixel_intensity * 0.7  # Somewhat transparent
+                
+                # Add to buffer with additive blending for glow effect
+                curr_r, curr_g, curr_b, curr_a = buffer[pixel_pos]
+                buffer[pixel_pos] = [
+                    max(curr_r, r),
+                    max(curr_g, g),
+                    max(curr_b, b),
+                    max(curr_a, alpha)
+                ]
+        
+        # Update and render fireflies
+        new_fireflies = []
+        for firefly in instate['fireflies'][strip_id]:
+            # Check if it's time to change direction
+            if current_time - firefly['last_direction_change'] > firefly['direction_change_interval']:
+                firefly['direction'] *= -1  # Reverse direction
+                firefly['last_direction_change'] = current_time
+                firefly['direction_change_interval'] = 2.0 + np.random.random() * 4.0  # New interval
+            
+            # Update position
+            firefly['position'] += firefly['speed'] * firefly['direction'] * delta_time
+            
+            # Handle wrapping
+            firefly['position'] %= strip_length
+            
+            # Calculate blink effect - more distinct on/off for fireflies
+            blink_phase = (current_time * firefly['blink_rate']) % 1.0
+            
+            # Fireflies have a brief "on" period
+            is_on = blink_phase < firefly['blink_duration']
+            
+            # Keep all fireflies
+            new_fireflies.append(firefly)
+            
+            if is_on:
+                # Draw the firefly when it's on
+                pos_int = int(firefly['position'])
+                
+                # Get color
+                h, s, v = instate['colors'][firefly['color']]
+                
+                # Make color brighter for fireflies
+                v = min(1.0, v * 1.2)
+                
+                # Convert to RGB
+                r, g, b = hsv_to_rgb(h, s, v)
+                
+                # Set pixel with high alpha
+                alpha = 0.9
+                
+                # Add to buffer with additive blending
+                curr_r, curr_g, curr_b, curr_a = buffer[pos_int]
+                buffer[pos_int] = [
+                    max(curr_r, r),
+                    max(curr_g, g),
+                    max(curr_b, b),
+                    max(curr_a, alpha)
+                ]
+                
+                # Add small glow around firefly
+                for offset in [-1, 1]:
+                    glow_pos = (pos_int + offset) % strip_length
+                    
+                    # Glow is more green/yellow regardless of firefly color
+                    glow_h, glow_s, glow_v = instate['colors']['green_yellow']
+                    glow_r, glow_g, glow_b = hsv_to_rgb(glow_h, glow_s * 0.7, glow_v * 0.7)
+                    
+                    glow_alpha = 0.6  # Noticeable glow
+                    
+                    # Add to buffer with additive blending
+                    curr_r, curr_g, curr_b, curr_a = buffer[glow_pos]
+                    buffer[glow_pos] = [
+                        max(curr_r, glow_r),
+                        max(curr_g, glow_g),
+                        max(curr_b, glow_b),
+                        max(curr_a, glow_alpha)
+                    ]
+        
+        # Update firefly list
+        instate['fireflies'][strip_id] = new_fireflies
