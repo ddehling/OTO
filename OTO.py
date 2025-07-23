@@ -127,8 +127,8 @@ if __name__ == "__main__":
     scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
-    #env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
-    #env_system.scheduler.schedule_event(00, 8000000, OTO_blink)  # noqa: F405
+    env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_danger_pulse)  # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_sunrise_joy) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_sad_theme) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_angry_theme) # noqa: F405

@@ -3813,3 +3813,76 @@ def OTO_neutral_positive(instate, outstate):
                             min(1.0, curr_b + b * edge_profile * 0.7),
                             max(curr_a, edge_profile * 0.7)
                         ]
+                        
+def OTO_danger_pulse(instate, outstate):
+    """
+    Generator function that creates a pulsing effect indicating danger.
+    
+    Features:
+    1. Global alpha controlled by outstate['control_danger'] value
+    2. All pixels slowly cycle from 50% to 100% brightness
+    3. Uses red color to indicate danger
+    
+    Simple but effective for indicating danger state.
+    """
+    name = 'danger_pulse'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['pulse_phase'] = 0.0      # Current phase of the pulse (0.0-1.0)
+        instate['pulse_speed'] = 0.5      # Pulses per second (adjust for faster/slower)
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get danger level from outstate (default to 0)
+    danger_level = outstate.get('control_danger', 0.0)/100
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = danger_level
+    
+    # Skip rendering if alpha is too low
+    if danger_level < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * danger_level
+    
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Update pulse phase
+    instate['pulse_phase'] += instate['pulse_speed'] * delta_time
+    instate['pulse_phase'] %= 1.0  # Keep within 0-1 range
+    
+    # Calculate brightness factor using sine wave for smooth pulsing
+    # Map sine wave from -1 to 1 → 0.5 to 1.0 brightness
+    brightness = 0.5 + 0.25 * (1.0 + np.sin(instate['pulse_phase'] * 2 * np.pi))
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Set danger color (bright red)
+    r, g, b = 1.0, 1.0, 1.0
+    
+    # Process each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        # Fill buffer with pulsing red at calculated brightness
+        buffer[:] = [r * brightness, g * brightness, b * brightness, 0.8]

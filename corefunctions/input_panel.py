@@ -34,7 +34,7 @@ class InputPanel(QMainWindow):
         
         # Create sliders
         self.sliders = {}
-        slider_names = ["Intensity", "Speed", "Hue","Joyful","Sad","Angry","Curious","Passionate","Rage","Contemplative","Neutral"]
+        slider_names = ["Intensity", "Speed", "Hue","Danger","Joyful","Sad","Angry","Curious","Passionate","Rage","Contemplative","Neutral"]
         
         for i, name in enumerate(slider_names):
             # Create a horizontal layout for each slider
