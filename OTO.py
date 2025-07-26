@@ -5,6 +5,7 @@ from sceneutils.OTO_dev import *  # noqa: F403
 from sceneutils.OTO_inactive import *  # noqa: F403
 from sceneutils.OTO_emotions import *  # noqa: F403
 from corefunctions.input_panel import InputPanel 
+from PyQt5.QtWidgets import QApplication 
  # noqa: F403
 #
 class EnvironmentalSystem:
@@ -24,7 +25,7 @@ class EnvironmentalSystem:
         self.smoothed_values = self.input_values.copy()
         
         # Set smoothing factor (0-1, lower values mean more smoothing)
-        self.smoothing_factor = 0.008
+        self.smoothing_factor = 0.08
         
         # Track last update time for consistent smoothing
         self.last_update_time = time.time()
@@ -118,13 +119,17 @@ class EnvironmentalSystem:
         
         # Update the scheduler
         self.scheduler.update()
+        
+        if QApplication.instance():
+            QApplication.instance().processEvents()
+
 
 
 # Main execution
 if __name__ == "__main__":
     scheduler = EventScheduler()
     env_system = EnvironmentalSystem(scheduler)
-    scheduler.setup_visualizer(True) 
+    scheduler.setup_visualizer(False) 
     # Start with summer bloom weather
    
     env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
