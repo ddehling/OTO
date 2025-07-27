@@ -195,7 +195,7 @@
     },
     {
     "id": "stair_arc_1",
-    "length": 300,
+    "length": 125,
     "groups": ["base","top"],
     "type": "arc",
     "position": {
@@ -213,7 +213,7 @@
   },
     {
     "id": "stair_arc_2",
-    "length": 400,
+    "length": 175,
     "groups": ["base","middle"],
     "type": "arc",
     "position": {
@@ -231,7 +231,7 @@
   },
     {
     "id": "stair_arc_3",
-    "length": 500,
+    "length": 225,
     "groups": ["base", "bottom"],
     "type": "arc",
     "position": {

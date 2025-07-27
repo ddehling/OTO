@@ -75,6 +75,7 @@ class SACNPixelSender:
         :param output_buffers: Dictionary mapping strip_id to buffer arrays
         :param strip_info: List of tuples (strip_id, length, direction)
         """
+        gamma=2.2
         for receiver, universes in zip(self.receivers, self.receiver_universes):
             # Concatenate all strip data for this receiver
             all_pixel_data = []
@@ -84,7 +85,7 @@ class SACNPixelSender:
                 buffer = output_buffers[strip_id]
                 
                 # Convert from float (0-1) to uint8 (0-255)
-                rgb_data = (buffer[:, :3] * 255).astype(np.uint8)
+                rgb_data = (np.power(buffer[:, :3],gamma) * 255).astype(np.uint8)
                 
                 # Reverse the strip if direction is -1
                 if direction == -1:

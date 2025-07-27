@@ -34,7 +34,7 @@ class InputPanel(QMainWindow):
         
         # Create sliders
         self.sliders = {}
-        slider_names = ["Intensity", "Speed", "Hue","Danger","Joyful","Sad","Angry","Curious","Passionate","Rage","Contemplative","Neutral"]
+        slider_names = ["Intensity", "Speed","Sensor", "Danger","Joyful","Sad","Angry","Curious","Passionate","Rage","Contemplative","Neutral"]
         
         for i, name in enumerate(slider_names):
             # Create a horizontal layout for each slider
@@ -83,7 +83,7 @@ class InputPanel(QMainWindow):
         self.mode_group = QButtonGroup(self)
         self.mode_group.setExclusive(True)  # Make buttons exclusive
         
-        mode_names = ["Waiting", "Inactive", "Mode 3", "Mode 4"]
+        mode_names = ["Awaken", "Inactive", "Mode 3", "Mode 4"]
         
         # Default selected mode
         self.values['selected_mode'] = 'Waiting'

@@ -51,8 +51,9 @@ def OTO_inactive_pattern_cycle(instate, outstate):
     # Set main generator alpha to full
     buffers.generator_alphas[name] = 1.0
     global_alpha=outstate.get('control_mode_inactive', 1)
-    if global_alpha<0.01:
+    if global_alpha<0.01:   
         return
+    
     # Update current pattern position based on time
     time_position = (outstate['current_time'] % instate['cycle_duration']) / instate['cycle_duration']
     instate['current_pattern'] = time_position * instate['num_patterns']
@@ -368,3 +369,261 @@ def OTO_generic_pattern(instate, outstate):
             buffer[i] = [intensity, intensity * 0.8, intensity * 0.5, intensity]
 
 
+# ... existing code ...
+
+def OTO_awaken(instate, outstate):
+    """
+    Awakening pattern generator with movement between base strips and ear animations.
+    
+    Features:
+    1. Base groups: Movement flows between bottom, middle, and top strips
+    2. Ear strips: Spinning movement when control_sensor is active
+    3. Alpha level controlled by outstate['control_mode_awaken']
+    
+    The pattern creates a flow of energy moving from bottom strips to middle strips
+    to top strips, simulating an awakening or activation sequence.
+    """
+    name = 'awaken'
+    buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
+
+    if instate['count'] == 0:
+        # Register our generator on first run
+        buffers.register_generator(name)
+        
+        # Initialize parameters
+        instate['flow_position'] = 0.0  # Position in flow cycle (0 to 1)
+        instate['flow_speed'] = 0.3     # Speed of the flow (units per second)
+        instate['ear_rotation'] = 0.0   # Rotation angle for ear spinning effect
+        
+        # Track which strips belong to each section of the base
+        instate['base_bottom_strips'] = []
+        instate['base_middle_strips'] = []
+        instate['base_top_strips'] = []
+        instate['ear_strips'] = []
+        
+        # Identify and categorize strips
+        for strip_id in strip_manager.strips:
+            strip = strip_manager.get_strip(strip_id)
+            
+            if 'base' in strip.groups:
+                if 'bottom' in strip.groups:
+                    instate['base_bottom_strips'].append(strip_id)
+                elif 'middle' in strip.groups:
+                    instate['base_middle_strips'].append(strip_id)
+                elif 'top' in strip.groups:
+                    instate['base_top_strips'].append(strip_id)
+            
+            if 'ear' in strip.groups:
+                instate['ear_strips'].append(strip_id)
+        
+        return
+
+    if instate['count'] == -1:
+        # Cleanup when pattern is ending
+        buffers.generator_alphas[name] = 0
+        return
+
+    # Get alpha level from outstate
+    alpha = outstate.get('control_mode_awaken', 0.0)
+    
+    # Apply alpha level to the generator
+    buffers.generator_alphas[name] = alpha
+    
+    # Skip rendering if alpha is too low
+    if alpha < 0.01:
+        return
+    
+    # Apply fade-out if the generator is ending
+    remaining_time = instate['duration'] - instate['elapsed_time']
+    if remaining_time < 10.0:
+        fade_alpha = remaining_time / 10.0
+        fade_alpha = max(0.0, fade_alpha)
+        buffers.generator_alphas[name] = fade_alpha * alpha
+        
+    # Get delta time for animation calculations
+    delta_time = outstate['current_time'] - outstate['last_time']
+    
+    # Update flow position (loops from 0 to 1)
+    instate['flow_position'] += instate['flow_speed'] * delta_time
+    if instate['flow_position'] > 1.0:
+        instate['flow_position'] -= 1.0
+    
+    # Check if ear spinning should be active
+    ear_spinning_active = outstate.get('control_sensor', 0.0) > 0.01
+    
+    # Update ear rotation angle if spinning is active
+    if ear_spinning_active:
+        rotation_speed = 1.5  # rotations per second
+        instate['ear_rotation'] += rotation_speed * 2 * np.pi * delta_time
+        # Keep rotation angle within 0 to 2π
+        if instate['ear_rotation'] > 2 * np.pi:
+            instate['ear_rotation'] -= 2 * np.pi
+    
+    # Get all buffers for this generator
+    pattern_buffers = buffers.get_all_buffers(name)
+    
+    # Calculate intensities for each section based on flow position
+    # Flow moves from bottom (0.0) to middle (0.33) to top (0.67) and back to bottom
+    
+    # First determine which phase of the flow we're in
+    if instate['flow_position'] < 0.33:  # Bottom to Middle phase
+        # Bottom: Bright to dim
+        bottom_intensity = 1.0 - (instate['flow_position'] / 0.33)
+        # Middle: Dim to bright
+        middle_intensity = instate['flow_position'] / 0.33
+        # Top: Dim
+        top_intensity = 0.1
+    elif instate['flow_position'] < 0.67:  # Middle to Top phase
+        # Bottom: Dim
+        bottom_intensity = 0.1
+        # Middle: Bright to dim
+        middle_intensity = 1.0 - ((instate['flow_position'] - 0.33) / 0.33)
+        # Top: Dim to bright
+        top_intensity = (instate['flow_position'] - 0.33) / 0.33
+    else:  # Top to Bottom phase
+        # Bottom: Dim to bright
+        bottom_intensity = (instate['flow_position'] - 0.67) / 0.33
+        # Middle: Dim
+        middle_intensity = 0.1
+        # Top: Bright to dim
+        top_intensity = 1.0 - ((instate['flow_position'] - 0.67) / 0.33)
+    
+    # Apply minimum intensity to ensure all sections have some illumination
+    bottom_intensity = max(0.1, bottom_intensity)
+    middle_intensity = max(0.1, middle_intensity)
+    top_intensity = max(0.1, top_intensity)
+    
+    # Render pattern to each buffer
+    for strip_id, buffer in pattern_buffers.items():
+        # Skip if strip doesn't exist in manager
+        if strip_id not in strip_manager.strips:
+            continue
+            
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
+        
+        # Base strip processing - determine which section it belongs to
+        if strip_id in instate['base_bottom_strips']:
+            # Bottom strips - pulsing cyan-blue with intensity based on flow
+            intensity = bottom_intensity * 0.8  # Scale for visual balance
+            
+            # Create a cyan-blue color with intensity modulation
+            r_val = 0.0
+            g_val = intensity * 0.6
+            b_val = intensity
+            a_val = intensity
+            
+            # Set uniform color for the strip
+            buffer[:] = [r_val, g_val, b_val, a_val]
+            
+            # Add random sparkles for more visual interest when at peak intensity
+            if bottom_intensity > 0.7:
+                sparkle_count = int(strip_length * 0.1)  # 10% of pixels get sparkles
+                sparkle_indices = np.random.choice(strip_length, sparkle_count, replace=False)
+                
+                for idx in sparkle_indices:
+                    sparkle_intensity = 0.8 + 0.2 * np.random.random()
+                    buffer[idx] = [
+                        0.1 * sparkle_intensity,  # Touch of white
+                        0.7 * sparkle_intensity, 
+                        sparkle_intensity, 
+                        sparkle_intensity
+                    ]
+        
+        elif strip_id in instate['base_middle_strips']:
+            # Middle strips - brighter cyan with intensity based on flow
+            intensity = middle_intensity * 0.9  # Scale for visual balance
+            
+            # Create a bright cyan color with intensity modulation
+            r_val = 0.0
+            g_val = intensity * 0.8
+            b_val = intensity
+            a_val = intensity
+            
+            # Set uniform color for the strip
+            buffer[:] = [r_val, g_val, b_val, a_val]
+            
+            # Add more pronounced sparkles for peak intensity
+            if middle_intensity > 0.7:
+                sparkle_count = int(strip_length * 0.15)  # 15% of pixels get sparkles
+                sparkle_indices = np.random.choice(strip_length, sparkle_count, replace=False)
+                
+                for idx in sparkle_indices:
+                    sparkle_intensity = 0.9 + 0.1 * np.random.random()
+                    buffer[idx] = [
+                        0.2 * sparkle_intensity,  # More white
+                        0.8 * sparkle_intensity, 
+                        sparkle_intensity, 
+                        sparkle_intensity
+                    ]
+        
+        elif strip_id in instate['base_top_strips']:
+            # Top strips - brightest blue-white with intensity based on flow
+            intensity = top_intensity * 1.0  # Full intensity
+            
+            # Create a blue-white color with intensity modulation
+            r_val = intensity * 0.3  # More white content
+            g_val = intensity * 0.8
+            b_val = intensity
+            a_val = intensity
+            
+            # Set uniform color for the strip
+            buffer[:] = [r_val, g_val, b_val, a_val]
+            
+            # Add bright white sparkles for peak intensity
+            if top_intensity > 0.7:
+                sparkle_count = int(strip_length * 0.2)  # 20% of pixels get sparkles
+                sparkle_indices = np.random.choice(strip_length, sparkle_count, replace=False)
+                
+                for idx in sparkle_indices:
+                    sparkle_intensity = 1.0  # Full brightness
+                    buffer[idx] = [
+                        0.7 * sparkle_intensity,  # Almost white
+                        0.9 * sparkle_intensity, 
+                        sparkle_intensity, 
+                        sparkle_intensity
+                    ]
+        
+        elif strip_id in instate['ear_strips'] and ear_spinning_active:
+            # Ear groups with spinning effect when sensor is active
+            for i in range(strip_length):
+                # Calculate angle position in the circular pattern
+                angle_pos = (i / strip_length) * 2 * np.pi
+                
+                # Combine with current rotation angle
+                combined_angle = angle_pos + instate['ear_rotation']
+                
+                # Create an intensity pattern with multiple peaks
+                num_peaks = 3  # Number of bright spots in the rotation
+                intensity = 0.5 + 0.5 * np.cos(combined_angle * num_peaks)
+                
+                # Add color variation based on angle
+                hue = (combined_angle / (2 * np.pi)) % 1.0
+                r, g, b = hsv_to_rgb(hue, 0.7, intensity)
+                
+                buffer[i] = [r, g, b, intensity * 0.8]
+        
+        elif strip_id in instate['ear_strips'] and not ear_spinning_active:
+            # Ear groups with subtle pulsing when sensor is not active
+            pulse_rate = 0.5  # Pulses per second
+            pulse_phase = (outstate['current_time'] * pulse_rate) % 1.0
+            
+            # Simple pulsing effect
+            intensity = 0.2 + 0.3 * np.sin(pulse_phase * 2 * np.pi)
+            
+            # Gentle blue pulse
+            buffer[:] = [0.0, intensity * 0.5, intensity, intensity]
+        
+        else:
+            # Other strips - subtle blue pulsing
+            pulse_rate = 0.3  # Slower pulse for background strips
+            pulse_phase = (outstate['current_time'] * pulse_rate) % 1.0
+            
+            # Simple pulsing effect
+            intensity = 0.1 + 0.1 * np.sin(pulse_phase * 2 * np.pi)
+            
+            # Very subtle blue glow
+            buffer[:] = [0.0, intensity * 0.3, intensity, intensity * 0.5]
+
+# ... existing code ...

@@ -64,7 +64,7 @@ class EnvironmentalSystem:
         
         # Apply exponential smoothing and send to scheduler
         for key, raw_value in raw_values.items():
-            #print(key)
+            
             # Handle actual selected_mode and selected_effect without smoothing
             if key in ['selected_mode', 'selected_effect']:
                 self.smoothed_values[key] = raw_value
@@ -129,7 +129,7 @@ class EnvironmentalSystem:
 if __name__ == "__main__":
     scheduler = EventScheduler()
     env_system = EnvironmentalSystem(scheduler)
-    scheduler.setup_visualizer(False) 
+    scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
     env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
@@ -142,7 +142,9 @@ if __name__ == "__main__":
     env_system.scheduler.schedule_event(00, 8000000, OTO_rage_lightning) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_contemplative_cosmic) # noqa: F405
     env_system.scheduler.schedule_event(00, 8000000, OTO_neutral_positive) # noqa: F405
-    lasttime = time.time()
+    env_system.scheduler.schedule_event(00, 8000000, OTO_inactive_pattern_cycle) # noqa: F405
+    env_system.scheduler.schedule_event(00, 8000000, OTO_awaken) # noqa: F405
+    lasttime = time.perf_counter()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
     try:

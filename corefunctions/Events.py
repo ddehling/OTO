@@ -201,14 +201,19 @@ class EventScheduler:
         self.state['last_time'] = self.state['current_time']
         
         self.state['buffers'].merge_buffers(self.state['output'])
+        
+    
+                # Update the visualizer if enabled
+        if self.state['visualize'] and self.visualizer is not None:
+            self.visualizer.update(self.state['output'])
+        
         if self.state['use_dmx'] and self.dmx_senders:
+            #self.state['output']=np.power(self.state['output'],2.8)
             self.strip_manager.send_dmx(self.state['output'], self.dmx_senders)
     
 
         
-        # Update the visualizer if enabled
-        if self.state['visualize'] and self.visualizer is not None:
-            self.visualizer.update(self.state['output'])
+
         # Render all frames
         # frames = []
         # for scene in self.state['render']:

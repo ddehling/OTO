@@ -1,6 +1,7 @@
 from sceneutils.imgutils import *  # noqa: F403
 import numpy as np
 from pathlib import Path
+from colorsys import hsv_to_rgb
 
 
 def OTO_sunrise_joy(instate, outstate):
@@ -992,13 +993,12 @@ def OTO_angry_theme(instate, outstate):
     Features:
     1. Global alpha controlled by outstate['control_angry'] value
     2. Red, orange, and brown color palette to evoke fire and rage
-    3. Explosive bursts on brain and ear strips that appear and dissipate rapidly
-    4. Flame effects on spine strips with upward moving flames and ember particles
-    5. Pulsing, intense heartbeat on heart strips with rapid, strong beats
-    6. Base strips with rolling flames and occasional explosions
-    
-    Optimized with vectorized operations for performance.
+    3. Simplified flame effects and explosions
+    4. Optimized with vectorized operations where beneficial
     """
+    import numpy as np
+    from colorsys import hsv_to_rgb  # Use standard Python library for simplicity
+    
     name = 'angry_theme'
     buffers = outstate['buffers']
     strip_manager = buffers.strip_manager
@@ -1010,9 +1010,7 @@ def OTO_angry_theme(instate, outstate):
         # Initialize parameters
         instate['explosions'] = {}  # Track explosion effects
         instate['flames'] = {}      # Track flame particles
-        instate['embers'] = {}      # Track ember particles
         instate['heart_phase'] = 0.0  # For heartbeat timing
-        instate['explosion_timer'] = {}  # Time tracker for explosion creation (per strip)
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -1020,11 +1018,7 @@ def OTO_angry_theme(instate, outstate):
             'orange': [0.05, 0.95, 0.9],         # Bright orange
             'yellow': [0.12, 0.85, 0.9],         # Fire yellow
             'deep_red': [0.98, 0.9, 0.7],        # Deep red
-            'brown': [0.08, 0.8, 0.5],           # Reddish brown
-            'ember': [0.05, 0.7, 0.8],           # Glowing ember orange
-            'ash': [0.05, 0.2, 0.3]              # Dark ash color
         }
-        
         return
 
     if instate['count'] == -1:
@@ -1046,8 +1040,7 @@ def OTO_angry_theme(instate, outstate):
     remaining_time = instate['duration'] - instate['elapsed_time']
     if remaining_time < 10.0:
         fade_alpha = remaining_time / 10.0
-        fade_alpha = max(0.0, fade_alpha)
-        buffers.generator_alphas[name] = fade_alpha * angry_level
+        buffers.generator_alphas[name] = max(0.0, fade_alpha) * angry_level
     
     # Get delta time for animation calculations
     delta_time = outstate['current_time'] - outstate['last_time']
@@ -1069,880 +1062,323 @@ def OTO_angry_theme(instate, outstate):
         strip_length = len(buffer)
         
         # Start with a base color - dim red glow
-        base_hue, base_sat, base_val = instate['colors']['deep_red']
-        base_r, base_g, base_b = hsv_to_rgb(base_hue, base_sat * 0.3, base_val * 0.2)
+        h, s, v = instate['colors']['deep_red']
+        base_r, base_g, base_b = hsv_to_rgb(h, s * 0.3, v * 0.2)
         buffer[:] = [base_r, base_g, base_b, 0.2]  # Dim base
 
-        # Different effects based on strip type
-        if 'spine' in strip.groups:
-            # Spine strips - upward moving flames and embers
-            
-            # Initialize flame particles for this strip if not already done
-            if strip_id not in instate['flames']:
-                instate['flames'][strip_id] = []
-                instate['embers'][strip_id] = []
-                
-                # Pre-populate with some initial flames
-                num_initial_flames = strip_length // 10  # About 1 flame every 10 pixels
-                for _ in range(num_initial_flames):
-                    # Random position along strip
-                    pos = np.random.randint(0, strip_length)
-                    
-                    instate['flames'][strip_id].append({
-                        'position': pos,
-                        'speed': 35 + np.random.random() * 20,  # 25-45 pixels per second (fast upward)
-                        'size': 65 + np.random.randint(0, 10),  # 15-25 pixels for taller flames
-                        'intensity': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 intensity
-                        'life': 0.0,  # 0.0-1.0 life cycle
-                        'duration': 3.5 + np.random.random() * 0.5  # 0.5-1.0 second lifetime
-                    })
-            
-            # Get current time
-            current_time = outstate['current_time']
-            
-            # Chance to create new flames
-            if np.random.random() < 0.2:  # 20% chance per frame
-                # Create at bottom of strip
-                pos = strip_length - np.random.randint(1, 10)  # Start near bottom with slight randomness
-                
-                instate['flames'][strip_id].append({
-                    'position': pos,
-                    'speed': 35 + np.random.random() * 20,  # 25-45 pixels per second
-                    'size': 15 + np.random.randint(0, 10),  # 15-25 pixels
-                    'intensity': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 intensity
-                    'life': 0.0,
-                    'duration': 3.5 + np.random.random() * 0.5  # 0.5-1.0 second lifetime
-                })
-            
-            # Chance to create embers
-            if np.random.random() < 0.2:  # 10% chance per frame
-                pos = strip_length - np.random.randint(1, 20)  # Start near bottom
-                
-                # Create an ember particle
-                instate['embers'][strip_id].append({
-                    'position': pos,
-                    'speed': 40 + np.random.random() * 30,  # 40-70 pixels per second (faster than flames)
-                    'wobble_amplitude': 1 + np.random.random() * 2,  # 1-3 pixels side-to-side
-                    'wobble_frequency': 5 + np.random.random() * 5,  # 5-10 Hz
-                    'wobble_offset': np.random.random() * 2 * np.pi,  # Random phase
-                    'intensity': 0.6 + np.random.random() * 0.4,  # 0.6-1.0 intensity
-                    'life': 0.0,
-                    'duration': 0.7 + np.random.random() * 0.7  # 0.7-1.4 second lifetime
-                })
-            
-            # Update existing flames - use a temporary buffer for vectorized operations
-            temp_buffer = np.zeros((strip_length, 4))
-            new_flames = []
-            
-            for flame in instate['flames'][strip_id]:
-                # Update life
-                flame['life'] += delta_time / flame['duration']
-                
-                # Update position - flames move upward (toward index 0)
-                flame['position'] -= flame['speed'] * delta_time
-                
-                # Keep if still in strip and not at end of life
-                if flame['position'] > -flame['size'] and flame['life'] < 1.0:
-                    new_flames.append(flame)
-                    
-                    # Calculate flame intensity based on life cycle
-                    if flame['life'] < 0.2:
-                        # Flame growing
-                        flame_alpha = flame['intensity'] * (flame['life'] / 0.2)
-                    elif flame['life'] > 0.8:
-                        # Flame fading
-                        flame_alpha = flame['intensity'] * (1.0 - ((flame['life'] - 0.8) / 0.2))
-                    else:
-                        # Flame at full intensity
-                        flame_alpha = flame['intensity']
-                    
-                    # Draw the flame
-                    flame_center = int(flame['position'])
-                    
-                    # Calculate valid positions in the flame
-                    start = max(0, flame_center)
-                    end = min(strip_length, flame_center + flame['size'] + 1)
-                    
-                    if start < end:  # Only proceed if there are valid positions
-                        # Calculate indices in the flame (0 at center, increasing downward)
-                        flame_indices = np.arange(start - flame_center, end - flame_center)
-                        
-                        # Calculate relative positions in flame (0 at tip, 1 at base)
-                        rel_positions = flame_indices / flame['size']
-                        
-                        # Determine color sections vectorized
-                        tip_mask = rel_positions < 0.2
-                        middle_mask = (rel_positions >= 0.2) & (rel_positions < 0.5)
-                        base_mask = rel_positions >= 0.5
-                        
-                        # Initialize RGB arrays
-                        r_values = np.zeros(len(flame_indices))
-                        g_values = np.zeros(len(flame_indices))
-                        b_values = np.zeros(len(flame_indices))
-                        
-                        # Apply colors based on masks
-                        if np.any(tip_mask):
-                            # Tip of flame - yellow/white
-                            h, s, v = instate['colors']['yellow']
-                            # Make tip brighter
-                            v = min(1.0, v * 1.2)
-                            s *= 0.8  # Less saturated (more white)
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[tip_mask] = r
-                            g_values[tip_mask] = g
-                            b_values[tip_mask] = b
-                        
-                        if np.any(middle_mask):
-                            # Middle of flame - orange
-                            h, s, v = instate['colors']['orange']
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[middle_mask] = r
-                            g_values[middle_mask] = g
-                            b_values[middle_mask] = b
-                        
-                        if np.any(base_mask):
-                            # Base of flame - red
-                            h, s, v = instate['colors']['deep_red']
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[base_mask] = r
-                            g_values[base_mask] = g
-                            b_values[base_mask] = b
-                        
-                        # Calculate intensities vectorized
-                        # Brightest in middle, dimmer at edges
-                        intensities = 1.0 - abs((rel_positions * 2) - 1.0)
-                        pixel_intensities = flame_alpha * intensities
-                        
-                        # Create pixel values
-                        pixels = np.stack([
-                            r_values, 
-                            g_values, 
-                            b_values, 
-                            pixel_intensities
-                        ], axis=1)
-                        
-                        # Add to temp buffer with additive blending
-                        valid_positions = np.arange(start, end)
-                        temp_buffer[valid_positions] = np.maximum(
-                            temp_buffer[valid_positions],
-                            pixels
-                        )
-            
-            # Replace with updated list
-            instate['flames'][strip_id] = new_flames
-            
-            # Update existing embers - vectorized where possible
-            new_embers = []
-            
-            for ember in instate['embers'][strip_id]:
-                # Update life
-                ember['life'] += delta_time / ember['duration']
-                
-                # Update position - embers move upward (toward index 0)
-                base_position = ember['position'] - ember['speed'] * delta_time
-                
-                # Add wobble for natural movement
-                wobble = ember['wobble_amplitude'] * np.sin(
-                    outstate['current_time'] * ember['wobble_frequency'] + ember['wobble_offset']
-                )
-                
-                # Actual position with wobble
-                ember['position'] = base_position
-                
-                # Keep if still in strip and not at end of life
-                if ember['position'] > 0 and ember['life'] < 1.0:
-                    new_embers.append(ember)
-                    
-                    # Calculate ember intensity based on life cycle
-                    if ember['life'] < 0.1:
-                        # Ember growing
-                        ember_alpha = ember['intensity'] * (ember['life'] / 0.1)
-                    elif ember['life'] > 0.7:
-                        # Ember fading
-                        ember_alpha = ember['intensity'] * (1.0 - ((ember['life'] - 0.7) / 0.3))
-                    else:
-                        # Ember at full intensity
-                        ember_alpha = ember['intensity']
-                    
-                    # Draw the ember with wobble
-                    ember_pos = int(ember['position'] + wobble)
-                    
-                    if 0 <= ember_pos < strip_length:
-                        # Get ember color
-                        h, s, v = instate['colors']['ember']
-                        
-                        # Adjust brightness based on life (brightest in middle of life)
-                        life_factor = 1.0 - abs((ember['life'] * 2) - 1.0)
-                        v = v * (0.7 + 0.3 * life_factor)
-                        
-                        # Convert to RGB
-                        r, g, b = hsv_to_rgb(h, s, v)
-                        
-                        # Add to temp buffer with maximum blending
-                        temp_buffer[ember_pos] = np.maximum(
-                            temp_buffer[ember_pos],
-                            [r, g, b, ember_alpha]
-                        )
-                        
-                        # Add small glow around ember
-                        for i in range(1, 3):
-                            for offset in [-i, i]:
-                                glow_pos = ember_pos + offset
-                                if 0 <= glow_pos < strip_length:
-                                    glow_alpha = ember_alpha * (1.0 - (i / 3.0))
-                                    temp_buffer[glow_pos] = np.maximum(
-                                        temp_buffer[glow_pos],
-                                        [r * 0.5, g * 0.5, b * 0.5, glow_alpha * 0.5]
-                                    )
-            
-            # Replace with updated list
-            instate['embers'][strip_id] = new_embers
-            
-            # Apply the temp buffer to the actual buffer with additive blending
-            for i in range(strip_length):
-                if temp_buffer[i, 3] > 0:  # If there's any opacity
-                    curr_r, curr_g, curr_b, curr_a = buffer[i]
-                    r, g, b, a = temp_buffer[i]
-                    
-                    buffer[i] = [
-                        min(1.0, curr_r + r),
-                        min(1.0, curr_g + g),
-                        min(1.0, curr_b + b),
-                        max(curr_a, a)
-                    ]
-            
-        elif 'heart' in strip.groups:
-            # Heart strips - rapid angry heartbeat - fully vectorized
-            
-            # Create intense heartbeat waveform
-            if instate['heart_phase'] < 0.1:
-                # Very sharp rise (systole)
-                intensity = instate['heart_phase'] / 0.1
-            elif instate['heart_phase'] < 0.2:
-                # Short peak
-                intensity = 1.0
-            elif instate['heart_phase'] < 0.3:
-                # Sharp decline
-                intensity = 1.0 - ((instate['heart_phase'] - 0.2) / 0.1)
-            elif instate['heart_phase'] < 0.4:
-                # Brief after-beat bump
-                intensity = 0.3 * ((instate['heart_phase'] - 0.3) / 0.1)
-            elif instate['heart_phase'] < 0.5:
-                # Small secondary peak
-                intensity = 0.3
-            else:
-                # Rest phase
-                intensity = 0.3 * (1.0 - ((instate['heart_phase'] - 0.5) / 0.5))
-            
-            # Make intensity stronger for anger
-            intensity = intensity * 0.7 + 0.3
-            
-            # Use bright red for the heart
-            h, s, v = instate['colors']['bright_red']
-            
-            # Adjust value based on heartbeat intensity
-            v_adjusted = v * intensity
-            
-            # Convert to RGB
-            r, g, b = hsv_to_rgb(h, s, v_adjusted)
-            
-            # Create distance array from center
-            positions = np.arange(strip_length)
-            center = strip_length // 2
-            dist = np.abs(positions - center) / (strip_length / 2)
-            
-            # Calculate pulse intensity based on distance from center
-            pulse_intensities = intensity * (1.0 - dist * 0.5)
-            
-            # Calculate vectorized colors with pulse
-            r_values = r * np.ones(strip_length)
-            g_values = g * (0.7 + 0.3 * pulse_intensities)
-            b_values = b * (0.7 + 0.3 * pulse_intensities)
-            a_values = (0.4 + 0.6 * intensity) * (0.8 + 0.2 * pulse_intensities)
-            
-            # Update buffer (vectorized)
-            buffer[:, 0] = r_values
-            buffer[:, 1] = g_values
-            buffer[:, 2] = b_values
-            buffer[:, 3] = a_values
+        # Apply strip-specific effects based on group
+        if 'heart' in strip.groups:
+            # Heart strips - rapid angry heartbeat
+            apply_heart_effect(buffer, strip_length, instate, outstate)
             
         elif 'brain' in strip.groups or 'ear' in strip.groups or 'head' in strip.groups:
             # Brain, ear, and head strips - explosive bursts
+            apply_explosive_effect(buffer, strip_length, strip_id, instate, outstate, delta_time)
             
-            # Initialize explosions for this strip if not already done
-            if strip_id not in instate['explosions']:
-                instate['explosions'][strip_id] = []
-                instate['explosion_timer'][strip_id] = 0.0
-                
-                # Create an initial explosion
-                center = np.random.randint(0, strip_length)
-                instate['explosions'][strip_id].append({
-                    'center': center,
-                    'radius': 0.0,  # Start with zero radius
-                    'max_radius': 5 + np.random.randint(0, 5),  # 5-10 pixels radius
-                    'expansion_rate': 30 + np.random.random() * 20,  # 30-50 pixels per second
-                    'intensity': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 intensity
-                    'life': 0.0,  # 0-1 life cycle
-                    'duration': 0.3 + np.random.random() * 0.3,  # 0.3-0.6 second duration (fast explosion)
-                    'color_shift': np.random.random() * 0.1  # Small random hue variation
-                })
-            
-            # Update explosion timer
-            instate['explosion_timer'][strip_id] += delta_time
-            
-            # Check if it's time for a new explosion
-            # More frequent explosions for anger
-            explosion_interval = 0.2 + np.random.random() * 0.4  # 0.2-0.6 seconds between explosions
-            
-            if instate['explosion_timer'][strip_id] >= explosion_interval:
-                instate['explosion_timer'][strip_id] = 0.0
-                
-                # Create a new explosion at random position
-                center = np.random.randint(0, strip_length)
-                
-                instate['explosions'][strip_id].append({
-                    'center': center,
-                    'radius': 0.0,
-                    'max_radius': 5 + np.random.randint(0, 5),  # 5-10 pixels radius
-                    'expansion_rate': 30 + np.random.random() * 20,  # 30-50 pixels per second
-                    'intensity': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 intensity
-                    'life': 0.0,
-                    'duration': 0.3 + np.random.random() * 0.3,  # 0.3-0.6 second duration
-                    'color_shift': np.random.random() * 0.1  # Small random hue variation
-                })
-            
-            # Create a temporary buffer for accumulating explosion effects
-            temp_buffer = np.zeros((strip_length, 4))
-            
-            # Update existing explosions
-            new_explosions = []
-            for explosion in instate['explosions'][strip_id]:
-                # Update life cycle
-                explosion['life'] += delta_time / explosion['duration']
-                
-                # Update radius - grows quickly then stops
-                if explosion['life'] < 0.6:  # Grow during first 60% of life
-                    explosion['radius'] += explosion['expansion_rate'] * delta_time
-                    explosion['radius'] = min(explosion['radius'], explosion['max_radius'])
-                
-                # Keep if still alive
-                if explosion['life'] < 1.0:
-                    new_explosions.append(explosion)
-                    
-                    # Calculate intensity based on life cycle
-                    if explosion['life'] < 0.2:
-                        # Quick ramp up
-                        explosion_alpha = explosion['intensity'] * (explosion['life'] / 0.2)
-                    elif explosion['life'] > 0.7:
-                        # Fade out
-                        explosion_alpha = explosion['intensity'] * (1.0 - ((explosion['life'] - 0.7) / 0.3))
-                    else:
-                        # Full intensity
-                        explosion_alpha = explosion['intensity']
-                    
-                    # Calculate the explosion using vectorized operations
-                    radius_int = int(explosion['radius'])
-                    center = explosion['center']
-                    
-                    # Create valid pixel positions array
-                    start = max(0, center - radius_int)
-                    end = min(strip_length, center + radius_int + 1)
-                    
-                    if start < end:  # Only proceed if there are valid positions
-                        # Calculate positions and distances
-                        positions = np.arange(start, end)
-                        distances = np.abs(positions - center) / explosion['radius'] if explosion['radius'] > 0 else np.ones(end - start)
-                        
-                        # Create masks for different parts of the explosion
-                        center_mask = distances < 0.2
-                        middle_mask = (distances >= 0.2) & (distances < 0.6)
-                        edge_mask = (distances >= 0.6) & (distances <= 1.0)
-                        
-                        # Initialize color arrays
-                        r_values = np.zeros(len(positions))
-                        g_values = np.zeros(len(positions))
-                        b_values = np.zeros(len(positions))
-                        a_values = np.zeros(len(positions))
-                        
-                        # Calculate pixel intensities
-                        pixel_intensities = explosion_alpha * (1.0 - distances**2)
-                        
-                        # Only process pixels with significant intensity
-                        valid_pixels = pixel_intensities > 0.05
-                        
-                        if np.any(valid_pixels):
-                            # Apply colors based on distance from center
-                            if np.any(center_mask & valid_pixels):
-                                # Center - yellow/white hot
-                                h, s, v = instate['colors']['yellow']
-                                # Desaturate center for white-hot look
-                                s *= 0.5
-                                v = min(1.0, v * 1.2)
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[center_mask & valid_pixels] = r
-                                g_values[center_mask & valid_pixels] = g
-                                b_values[center_mask & valid_pixels] = b
-                            
-                            if np.any(middle_mask & valid_pixels):
-                                # Middle - orange
-                                h, s, v = instate['colors']['orange']
-                                h = (h + explosion['color_shift']) % 1.0  # Slight color variation
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[middle_mask & valid_pixels] = r
-                                g_values[middle_mask & valid_pixels] = g
-                                b_values[middle_mask & valid_pixels] = b
-                            
-                            if np.any(edge_mask & valid_pixels):
-                                # Outer edge - red
-                                h, s, v = instate['colors']['bright_red']
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[edge_mask & valid_pixels] = r
-                                g_values[edge_mask & valid_pixels] = g
-                                b_values[edge_mask & valid_pixels] = b
-                            
-                            # Set alpha values for valid pixels
-                            a_values[valid_pixels] = pixel_intensities[valid_pixels]
-                            
-                            # Stack color components
-                            rgba_values = np.stack([r_values, g_values, b_values, a_values], axis=1)
-                            
-                            # Update temp buffer with maximum blending
-                            for i, pos in enumerate(positions):
-                                if valid_pixels[i]:
-                                    temp_buffer[pos] = np.maximum(temp_buffer[pos], rgba_values[i])
-            
-            # Replace with updated list
-            instate['explosions'][strip_id] = new_explosions
-            
-            # Apply the temp buffer to the actual buffer with additive blending
-            for i in range(strip_length):
-                if temp_buffer[i, 3] > 0:  # If there's any opacity
-                    curr_r, curr_g, curr_b, curr_a = buffer[i]
-                    r, g, b, a = temp_buffer[i]
-                    
-                    buffer[i] = [
-                        min(1.0, curr_r + r),
-                        min(1.0, curr_g + g),
-                        min(1.0, curr_b + b),
-                        max(curr_a, a)
-                    ]
+        elif 'spine' in strip.groups:
+            # Spine strips - upward moving flames
+            apply_flame_effect(buffer, strip_length, strip_id, instate, outstate, delta_time, direction=-1)
             
         elif 'base' in strip.groups:
-            # Base strips - rolling flames with occasional explosions
-            
-            # Initialize effects for this strip if not already done
-            if strip_id not in instate['flames']:
-                instate['flames'][strip_id] = []
-                instate['explosions'][strip_id] = []
-                instate['explosion_timer'][strip_id] = 0.0
-                
-                # Create initial flames along the strip
-                num_initial_flames = strip_length // 15  # About 1 flame every 15 pixels
-                for _ in range(num_initial_flames):
-                    pos = np.random.randint(0, strip_length)
-                    
-                    # For base strips, determine direction based on position
-                    middle = strip_length // 2
-                    direction = 1 if pos < middle else -1  # Away from middle
-                    
-                    instate['flames'][strip_id].append({
-                        'position': pos,
-                        'speed': 15 + np.random.random() * 15,  # 15-30 pixels per second
-                        'size': 8 + np.random.randint(0, 7),    # 8-15 pixels
-                        'height': 3 + np.random.randint(0, 4),  # 3-7 pixels height
-                        'intensity': 0.6 + np.random.random() * 0.4,  # 0.6-1.0 intensity
-                        'direction': direction,
-                        'life': 0.0,
-                        'duration': 0.8 + np.random.random() * 0.7  # 0.8-1.5 second lifetime
-                    })
-            
-            # Update explosion timer
-            instate['explosion_timer'][strip_id] += delta_time
-            
-            # Less frequent explosions on base strips
-            explosion_interval = 0.10 + np.random.random() * 0.2  # 0.1-0.3 seconds between explosions
-            
-            # Check if it's time for a new explosion
-            if instate['explosion_timer'][strip_id] >= explosion_interval:
-                instate['explosion_timer'][strip_id] = 0.0
-                
-                # Create a new explosion at random position
-                center = np.random.randint(0, strip_length)
-                
-                instate['explosions'][strip_id].append({
-                    'center': center,
-                    'radius': 0.0,
-                    'max_radius': 8 + np.random.randint(0, 7),  # 8-15 pixels radius (larger for base)
-                    'expansion_rate': 40 + np.random.random() * 30,  # 40-70 pixels per second
-                    'intensity': 0.7 + np.random.random() * 0.3,  # 0.7-1.0 intensity
-                    'life': 0.0,
-                    'duration': 0.4 + np.random.random() * 0.4,  # 0.4-0.8 second duration
-                    'color_shift': np.random.random() * 0.1  # Small random hue variation
-                })
-            
-            # Chance to create new flames
-            if np.random.random() < 0.1:  # 10% chance per frame
-                # Create at a random position
-                pos = np.random.randint(0, strip_length)
-                
-                # Determine direction (away from middle)
-                middle = strip_length // 2
-                direction = 1 if pos < middle else -1
-                
-                instate['flames'][strip_id].append({
-                    'position': pos,
-                    'speed': 15 + np.random.random() * 15,
-                    'size': 8 + np.random.randint(0, 7),
-                    'height': 3 + np.random.randint(0, 4),
-                    'intensity': 0.6 + np.random.random() * 0.4,
-                    'direction': direction,
-                    'life': 0.0,
-                    'duration': 0.8 + np.random.random() * 0.7
-                })
-            
-            # Create a temporary buffer for accumulating flame and explosion effects
-            temp_buffer = np.zeros((strip_length, 4))
-            
-            # Update existing flames
-            new_flames = []
-            for flame in instate['flames'][strip_id]:
-                # Update life
-                flame['life'] += delta_time / flame['duration']
-                
-                # Update position based on direction
-                flame['position'] += flame['speed'] * flame['direction'] * delta_time
-                
-                # Keep if still in bounds and alive
-                if ((0 <= flame['position'] < strip_length or 
-                     0 <= flame['position'] + flame['size'] < strip_length) and 
-                    flame['life'] < 1.0):
-                    new_flames.append(flame)
-                    
-                    # Calculate flame intensity based on life cycle
-                    if flame['life'] < 0.2:
-                        # Flame growing
-                        flame_alpha = flame['intensity'] * (flame['life'] / 0.2)
-                    elif flame['life'] > 0.7:
-                        # Flame fading
-                        flame_alpha = flame['intensity'] * (1.0 - ((flame['life'] - 0.7) / 0.3))
-                    else:
-                        # Flame at full intensity
-                        flame_alpha = flame['intensity']
-                    
-                    # Draw the flame - horizontal spread with height
-                    flame_center = int(flame['position'])
-                    
-                    # Create valid horizontal positions for this flame
-                    h_start = max(0, flame_center)
-                    h_end = min(strip_length, flame_center + flame['size'] * abs(flame['direction']))
-                    
-                    if h_start < h_end:
-                        # Get positions in array
-                        positions = np.arange(h_start, h_end)
-                        
-                        # Calculate relative positions in the flame
-                        if flame['direction'] > 0:
-                            rel_positions = (positions - flame_center) / flame['size']
-                        else:
-                            rel_positions = (flame_center - positions) / flame['size']
-                            rel_positions = np.flip(rel_positions)  # Correct orientation
-                        
-                        # Clamp relative positions to valid range
-                        rel_positions = np.clip(rel_positions, 0.0, 1.0)
-                        
-                        # Create masks for flame sections
-                        front_mask = rel_positions < 0.3  # Front of flame
-                        middle_mask = (rel_positions >= 0.3) & (rel_positions < 0.7)  # Middle
-                        back_mask = rel_positions >= 0.7  # Back of flame
-                        
-                        # Initialize color arrays
-                        r_values = np.zeros(len(positions))
-                        g_values = np.zeros(len(positions))
-                        b_values = np.zeros(len(positions))
-                        
-                        # Apply colors based on section
-                        if np.any(front_mask):
-                            # Front - more yellow
-                            h, s, v = instate['colors']['yellow']
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[front_mask] = r
-                            g_values[front_mask] = g
-                            b_values[front_mask] = b
-                        
-                        if np.any(middle_mask):
-                            # Middle - orange
-                            h, s, v = instate['colors']['orange']
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[middle_mask] = r
-                            g_values[middle_mask] = g
-                            b_values[middle_mask] = b
-                        
-                        if np.any(back_mask):
-                            # Back - deeper red
-                            h, s, v = instate['colors']['deep_red']
-                            r, g, b = hsv_to_rgb(h, s, v)
-                            r_values[back_mask] = r
-                            g_values[back_mask] = g
-                            b_values[back_mask] = b
-                        
-                        # Apply lapping effect - flames oscillate
-                        time_factors = outstate['current_time'] * 8.0 + positions * 0.2
-                        lap_factors = 0.2 * np.sin(time_factors)
-                        
-                        # Height factors give more variation
-                        height_factors = np.ones(len(positions))
-                        for j in range(1, flame['height'] + 1):
-                            # For each "height" level, add variation
-                            vert_pos = j / flame['height']
-                            height_factor = 1.0 - (abs(vert_pos - 0.5) * 1.2)  # Brightest in middle height
-                            
-                            # Calculate pixel intensities with lapping and height factors
-                            pixel_intensities = flame_alpha * height_factor * (1.0 + lap_factors)
-                            pixel_intensities = np.clip(pixel_intensities, 0.0, 1.0)
-                            
-                            # Create RGBA values for this set of pixels
-                            pixels = np.stack([r_values, g_values, b_values, pixel_intensities], axis=1)
-                            
-                            # Update temp buffer with maximum blending
-                            temp_buffer[positions] = np.maximum(temp_buffer[positions], pixels)
-            
-            # Replace with updated list
-            instate['flames'][strip_id] = new_flames
-            
-            # Update existing explosions
-            new_explosions = []
-            for explosion in instate['explosions'][strip_id]:
-                # Update life cycle
-                explosion['life'] += delta_time / explosion['duration']
-                
-                # Update radius - grows quickly then stops
-                if explosion['life'] < 0.6:  # Grow during first 60% of life
-                    explosion['radius'] += explosion['expansion_rate'] * delta_time
-                    explosion['radius'] = min(explosion['radius'], explosion['max_radius'])
-                
-                # Keep if still alive
-                if explosion['life'] < 1.0:
-                    new_explosions.append(explosion)
-                    
-                    # Calculate intensity based on life cycle
-                    if explosion['life'] < 0.2:
-                        # Quick ramp up
-                        explosion_alpha = explosion['intensity'] * (explosion['life'] / 0.2)
-                    elif explosion['life'] > 0.7:
-                        # Fade out
-                        explosion_alpha = explosion['intensity'] * (1.0 - ((explosion['life'] - 0.7) / 0.3))
-                    else:
-                        # Full intensity
-                        explosion_alpha = explosion['intensity']
-                    
-                    # Calculate the explosion using vectorized operations
-                    radius_int = int(explosion['radius'])
-                    center = explosion['center']
-                    
-                    # Create valid pixel positions array
-                    start = max(0, center - radius_int)
-                    end = min(strip_length, center + radius_int + 1)
-                    
-                    if start < end:  # Only proceed if there are valid positions
-                        # Calculate positions and distances
-                        positions = np.arange(start, end)
-                        distances = np.abs(positions - center) / explosion['radius'] if explosion['radius'] > 0 else np.ones(end - start)
-                        
-                        # Create masks for different parts of the explosion
-                        center_mask = distances < 0.2
-                        middle_mask = (distances >= 0.2) & (distances < 0.6)
-                        edge_mask = (distances >= 0.6) & (distances <= 1.0)
-                        
-                        # Initialize color arrays
-                        r_values = np.zeros(len(positions))
-                        g_values = np.zeros(len(positions))
-                        b_values = np.zeros(len(positions))
-                        a_values = np.zeros(len(positions))
-                        
-                        # Calculate pixel intensities
-                        pixel_intensities = explosion_alpha * (1.0 - distances**2)
-                        
-                        # Only process pixels with significant intensity
-                        valid_pixels = pixel_intensities > 0.05
-                        
-                        if np.any(valid_pixels):
-                            # Apply colors based on distance from center
-                            if np.any(center_mask & valid_pixels):
-                                # Center - yellow/white hot
-                                h, s, v = instate['colors']['yellow']
-                                # Desaturate center for white-hot look
-                                s *= 0.5
-                                v = min(1.0, v * 1.2)
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[center_mask & valid_pixels] = r
-                                g_values[center_mask & valid_pixels] = g
-                                b_values[center_mask & valid_pixels] = b
-                            
-                            if np.any(middle_mask & valid_pixels):
-                                # Middle - orange
-                                h, s, v = instate['colors']['orange']
-                                h = (h + explosion['color_shift']) % 1.0  # Slight color variation
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[middle_mask & valid_pixels] = r
-                                g_values[middle_mask & valid_pixels] = g
-                                b_values[middle_mask & valid_pixels] = b
-                            
-                            if np.any(edge_mask & valid_pixels):
-                                # Outer edge - red
-                                h, s, v = instate['colors']['bright_red']
-                                r, g, b = hsv_to_rgb(h, s, v)
-                                
-                                r_values[edge_mask & valid_pixels] = r
-                                g_values[edge_mask & valid_pixels] = g
-                                b_values[edge_mask & valid_pixels] = b
-                            
-                            # Set alpha values for valid pixels
-                            a_values[valid_pixels] = pixel_intensities[valid_pixels]
-                            
-                            # Stack color components
-                            rgba_values = np.stack([r_values, g_values, b_values, a_values], axis=1)
-                            
-                            # Update temp buffer with maximum blending
-                            for i, pos in enumerate(positions):
-                                if valid_pixels[i]:
-                                    temp_buffer[pos] = np.maximum(temp_buffer[pos], rgba_values[i])
-            
-            # Replace with updated list
-            instate['explosions'][strip_id] = new_explosions
-            
-            # Apply the temp buffer to the actual buffer with additive blending
-            for i in range(strip_length):
-                if temp_buffer[i, 3] > 0:  # If there's any opacity
-                    curr_r, curr_g, curr_b, curr_a = buffer[i]
-                    r, g, b, a = temp_buffer[i]
-                    
-                    buffer[i] = [
-                        min(1.0, curr_r + r),
-                        min(1.0, curr_g + g),
-                        min(1.0, curr_b + b),
-                        max(curr_a, a)
-                    ]
+            # Base strips - rolling flames
+            apply_flame_effect(buffer, strip_length, strip_id, instate, outstate, delta_time, direction=0)
             
         else:
-            # Other strips - fiery pulsing with heat waves - fully vectorized
-            
-            # Create positions array for the entire strip
-            positions = np.arange(strip_length)
-            
-            # Create normalized positions
-            norm_positions = positions / strip_length
-            
-            # Create heat wave pattern - multiple sine waves combined (vectorized)
-            wave1 = 0.5 + 0.5 * np.sin(norm_positions * 4 * np.pi + outstate['current_time'] * 3.0)
-            wave2 = 0.5 + 0.5 * np.sin(norm_positions * 7 * np.pi - outstate['current_time'] * 2.0)
-            wave3 = 0.5 + 0.5 * np.sin(norm_positions * 2 * np.pi + outstate['current_time'] * 1.0)
-            
-            # Combine waves with different weights (vectorized)
-            heat_intensities = (wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2)
-            
-            # Add pulsing effect (vectorized)
-            pulse = 0.7 + 0.3 * np.sin(outstate['current_time'] * 5.0)
-            heat_intensities *= pulse
-            
-            # Create masks for different intensity levels
-            very_hot_mask = heat_intensities > 0.8
-            hot_mask = (heat_intensities > 0.5) & (heat_intensities <= 0.8)
-            less_hot_mask = heat_intensities <= 0.5
-            
-            # Initialize color arrays
-            r_values = np.zeros(strip_length)
-            g_values = np.zeros(strip_length)
-            b_values = np.zeros(strip_length)
-            a_values = np.zeros(strip_length)
-            
-            # Apply colors based on heat intensity (vectorized)
-            if np.any(very_hot_mask):
-                # Very hot - yellow
-                h, s, v = instate['colors']['yellow']
-                r, g, b = hsv_to_rgb(h, s, v)
-                r_values[very_hot_mask] = r
-                g_values[very_hot_mask] = g
-                b_values[very_hot_mask] = b
-            
-            if np.any(hot_mask):
-                # Hot - orange
-                h, s, v = instate['colors']['orange']
-                r, g, b = hsv_to_rgb(h, s, v)
-                r_values[hot_mask] = r
-                g_values[hot_mask] = g
-                b_values[hot_mask] = b
-            
-            if np.any(less_hot_mask):
-                # Less hot - deep red
-                h, s, v = instate['colors']['deep_red']
-                r, g, b = hsv_to_rgb(h, s, v)
-                r_values[less_hot_mask] = r
-                g_values[less_hot_mask] = g
-                b_values[less_hot_mask] = b
-            
-            # Adjust brightness based on heat intensity (vectorized)
-            v_adjusted = 0.6 + 0.4 * heat_intensities
-            
-            # Apply to RGB values
-            r_values *= v_adjusted
-            g_values *= v_adjusted
-            b_values *= v_adjusted
-            
-            # Set alpha based on heat intensity
-            a_values = 0.3 + 0.7 * heat_intensities
-            
-            # Update buffer (vectorized)
-            buffer[:, 0] = r_values
-            buffer[:, 1] = g_values
-            buffer[:, 2] = b_values
-            buffer[:, 3] = a_values
-            
-            # Add ember sparks with random distribution
-            spark_positions = np.random.random(strip_length) < 0.005  # 0.5% chance per pixel
-            if np.any(spark_positions):
-                # Get ember color
-                h, s, v = instate['colors']['ember']
-                r, g, b = hsv_to_rgb(h, s, v)
-                
-                # Calculate spark intensities (vectorized)
-                spark_intensities = 0.8 + np.random.random(strip_length) * 0.2
-                
-                # Apply sparks
-                buffer[spark_positions, 0] = r
-                buffer[spark_positions, 1] = g
-                buffer[spark_positions, 2] = b
-                buffer[spark_positions, 3] = spark_intensities[spark_positions]
-        
-        # Apply additional random noise texture to ALL strips (vectorized)
-        # Create random intensity array
-        noise_intensities = 0.02 + np.random.random(strip_length) * 0.18  # 0.02-0.2 range
-        
-        # Choose random colors for each pixel
-        color_indices = np.random.randint(0, len(list(instate['colors'].keys())), strip_length)
-        color_names = list(instate['colors'].keys())
-        
-        # Apply noise to each pixel
-        for i in range(strip_length):
-            # Get color
-            h, s, v = instate['colors'][color_names[color_indices[i]]]
-            r, g, b = hsv_to_rgb(h, s, v)
-            
-            # Add to current pixel with additive blending
-            curr_r, curr_g, curr_b, curr_a = buffer[i]
-            intensity = noise_intensities[i]
-            
-            buffer[i] = [
-                min(1.0, curr_r + r * intensity),
-                min(1.0, curr_g + g * intensity),
-                min(1.0, curr_b + b * intensity),
-                max(curr_a, intensity)
-            ]
+            # Other strips - fiery pulsing
+            apply_pulse_effect(buffer, strip_length, instate, outstate)
 
+
+def apply_heart_effect(buffer, strip_length, instate, outstate):
+    """Apply heartbeat effect to heart strips"""
+    import numpy as np
+    from colorsys import hsv_to_rgb
+    
+    # Calculate heartbeat intensity
+    phase = instate['heart_phase']
+    if phase < 0.1:
+        # Very sharp rise (systole)
+        intensity = phase / 0.1
+    elif phase < 0.2:
+        # Short peak
+        intensity = 1.0
+    elif phase < 0.3:
+        # Sharp decline
+        intensity = 1.0 - ((phase - 0.2) / 0.1)
+    elif phase < 0.4:
+        # Brief after-beat bump
+        intensity = 0.3 * ((phase - 0.3) / 0.1)
+    elif phase < 0.5:
+        # Small secondary peak
+        intensity = 0.3
+    else:
+        # Rest phase
+        intensity = 0.3 * (1.0 - ((phase - 0.5) / 0.5))
+    
+    # Make intensity stronger for anger
+    intensity = intensity * 0.7 + 0.3
+    
+    # Use bright red for the heart
+    h, s, v = instate['colors']['bright_red']
+    v_adjusted = v * intensity
+    r, g, b = hsv_to_rgb(h, s, v_adjusted)
+    
+    # Create distance array from center
+    center = strip_length // 2
+    for i in range(strip_length):
+        dist = abs(i - center) / (strip_length / 2)
+        pulse_intensity = intensity * (1.0 - dist * 0.5)
+        buffer[i] = [
+            r,
+            g * (0.7 + 0.3 * pulse_intensity),
+            b * (0.7 + 0.3 * pulse_intensity),
+            (0.4 + 0.6 * intensity) * (0.8 + 0.2 * pulse_intensity)
+        ]
+
+
+def apply_explosive_effect(buffer, strip_length, strip_id, instate, outstate, delta_time):
+    """Apply explosive burst effects to brain/ear/head strips"""
+    import numpy as np
+    import random
+    from colorsys import hsv_to_rgb
+    
+    # Initialize explosions for this strip if not already done
+    if strip_id not in instate['explosions']:
+        instate['explosions'][strip_id] = []
+    
+    # Add new explosions
+    if random.random() < 0.1:  # Reduced probability
+        center = random.randint(0, strip_length - 1)
+        instate['explosions'][strip_id].append({
+            'center': center,
+            'radius': 0.0,
+            'max_radius': 5 + random.randint(0, 5),
+            'expansion_rate': 30 + random.random() * 20,
+            'intensity': 0.7 + random.random() * 0.3,
+            'life': 0.0,
+            'duration': 0.3 + random.random() * 0.3,
+        })
+    
+    # Update existing explosions
+    new_explosions = []
+    for explosion in instate['explosions'][strip_id]:
+        # Update life cycle
+        explosion['life'] += delta_time / explosion['duration']
+        
+        # Update radius - grows quickly then stops
+        if explosion['life'] < 0.6:  # Grow during first 60% of life
+            explosion['radius'] += explosion['expansion_rate'] * delta_time
+            explosion['radius'] = min(explosion['radius'], explosion['max_radius'])
+        
+        # Keep if still alive
+        if explosion['life'] < 1.0:
+            new_explosions.append(explosion)
+            
+            # Calculate intensity based on life cycle
+            if explosion['life'] < 0.2:
+                explosion_alpha = explosion['intensity'] * (explosion['life'] / 0.2)
+            elif explosion['life'] > 0.7:
+                explosion_alpha = explosion['intensity'] * (1.0 - ((explosion['life'] - 0.7) / 0.3))
+            else:
+                explosion_alpha = explosion['intensity']
+            
+            # Calculate the explosion effect
+            center = explosion['center']
+            radius = int(explosion['radius'])
+            
+            for i in range(max(0, center - radius), min(strip_length, center + radius + 1)):
+                dist = abs(i - center) / explosion['radius'] if explosion['radius'] > 0 else 1.0
+                if dist <= 1.0:
+                    # Determine color based on distance from center
+                    if dist < 0.3:
+                        # Center - yellow/white hot
+                        h, s, v = instate['colors']['yellow']
+                        s *= 0.5  # Desaturate for white-hot look
+                        v = min(1.0, v * 1.2)
+                    elif dist < 0.7:
+                        # Middle - orange
+                        h, s, v = instate['colors']['orange']
+                    else:
+                        # Outer edge - red
+                        h, s, v = instate['colors']['bright_red']
+                    
+                    r, g, b = hsv_to_rgb(h, s, v)
+                    intensity = explosion_alpha * (1.0 - dist**2)
+                    
+                    # Add to buffer with maximum blending
+                    curr_r, curr_g, curr_b, curr_a = buffer[i]
+                    buffer[i] = [
+                        max(curr_r, r),
+                        max(curr_g, g),
+                        max(curr_b, b),
+                        max(curr_a, intensity)
+                    ]
+    
+    # Replace with updated list
+    instate['explosions'][strip_id] = new_explosions
+
+
+def apply_flame_effect(buffer, strip_length, strip_id, instate, outstate, delta_time, direction=-1):
+    """Apply flame effects (direction: -1=up, 0=outward from center, 1=down)"""
+    import numpy as np
+    import random
+    from colorsys import hsv_to_rgb
+    
+    # Initialize flames for this strip if not already done
+    if strip_id not in instate['flames']:
+        instate['flames'][strip_id] = []
+        
+        # INCREASE INITIAL FLAMES: Change from strip_length // 10 to strip_length // 5
+        num_initial_flames = max(5, strip_length // 5)  # More initial flames
+        
+        for _ in range(num_initial_flames):
+            pos = random.randint(0, strip_length - 1)
+            
+            # Determine direction based on mode
+            if direction == 0:  # Outward from center
+                middle = strip_length // 2
+                flame_dir = 1 if pos < middle else -1
+            else:
+                flame_dir = direction
+            
+            instate['flames'][strip_id].append({
+                'position': pos,
+                'speed': 15 + random.random() * 15,
+                # INCREASE FLAME SIZE: from 8+7 to 12+10
+                'size': 12 + random.randint(0, 10),  # Larger flames
+                'intensity': 0.6 + random.random() * 0.4,
+                'direction': flame_dir,
+                'life': 0.0,
+                # INCREASE DURATION: from 0.8+0.7 to 1.2+1.0
+                'duration': 1.2 + random.random() * 1.0  # Longer-lasting flames
+            })
+    
+    # INCREASE FLAME CREATION PROBABILITY: from 0.1 to 0.2
+    if random.random() < 0.2:  # 20% chance per frame for new flames
+        if direction == -1:  # Upward flames (spine)
+            pos = strip_length - random.randint(1, 10)  # Start near bottom
+            flame_dir = direction
+        elif direction == 1:  # Downward flames
+            pos = random.randint(1, 10)  # Start near top
+            flame_dir = direction
+        else:  # Outward flames (base)
+            pos = random.randint(0, strip_length - 1)
+            middle = strip_length // 2
+            flame_dir = 1 if pos < middle else -1
+        
+        instate['flames'][strip_id].append({
+            'position': pos,
+            'speed': 15 + random.random() * 15,
+            # INCREASE FLAME SIZE: from 8+7 to 12+10
+            'size': 22 + random.randint(0, 10),  # Larger flames
+            'intensity': 0.6 + random.random() * 0.4,
+            'direction': flame_dir,
+            'life': 0.0,
+            # INCREASE DURATION: from 0.8+0.7 to 1.2+1.0
+            'duration': 1.2 + random.random() * 1.0  # Longer-lasting flames
+        })
+    
+    # Update existing flames
+    new_flames = []
+    for flame in instate['flames'][strip_id]:
+        # Update life
+        flame['life'] += delta_time / flame['duration']
+        
+        # Update position based on direction
+        flame['position'] += flame['speed'] * flame['direction'] * delta_time
+        
+        # Keep if still in bounds and alive
+        if 0 <= flame['position'] < strip_length and flame['life'] < 1.0:
+            new_flames.append(flame)
+            
+            # Calculate flame intensity based on life cycle
+            if flame['life'] < 0.2:
+                flame_alpha = flame['intensity'] * (flame['life'] / 0.2)
+            elif flame['life'] > 0.7:
+                flame_alpha = flame['intensity'] * (1.0 - ((flame['life'] - 0.7) / 0.3))
+            else:
+                flame_alpha = flame['intensity']
+            
+            # Draw the flame
+            flame_pos = int(flame['position'])
+            flame_size = flame['size']
+            
+            for i in range(max(0, flame_pos - flame_size), min(strip_length, flame_pos + flame_size + 1)):
+                # Calculate relative position in flame (0 to 1)
+                rel_pos = abs(i - flame_pos) / flame_size
+                if rel_pos <= 1.0:
+                    # Determine color based on position in flame
+                    if rel_pos < 0.3:
+                        # Tip of flame - yellow
+                        h, s, v = instate['colors']['yellow']
+                    elif rel_pos < 0.7:
+                        # Middle of flame - orange
+                        h, s, v = instate['colors']['orange']
+                    else:
+                        # Base of flame - red
+                        h, s, v = instate['colors']['deep_red']
+                    
+                    r, g, b = hsv_to_rgb(h, s, v)
+                    intensity = flame_alpha * (1.0 - rel_pos)
+                    
+                    # Add to buffer with maximum blending
+                    curr_r, curr_g, curr_b, curr_a = buffer[i]
+                    buffer[i] = [
+                        max(curr_r, r),
+                        max(curr_g, g),
+                        max(curr_b, b),
+                        max(curr_a, intensity)
+                    ]
+    
+    # Replace with updated list
+    instate['flames'][strip_id] = new_flames
+
+
+def apply_pulse_effect(buffer, strip_length, instate, outstate):
+    """Apply pulsing flame effect to other strips"""
+    import numpy as np
+    import random
+    from colorsys import hsv_to_rgb
+    
+    # Calculate wave parameters for fire effect
+    current_time = outstate['current_time']
+    
+    # Create pulsing effect
+    pulse = 0.7 + 0.3 * np.sin(current_time * 5.0)
+    
+    for i in range(strip_length):
+        # Create heat wave pattern
+        norm_pos = i / strip_length
+        wave1 = 0.5 + 0.5 * np.sin(norm_pos * 4 * np.pi + current_time * 3.0)
+        wave2 = 0.5 + 0.5 * np.sin(norm_pos * 7 * np.pi - current_time * 2.0)
+        heat = (wave1 * 0.6 + wave2 * 0.4) * pulse
+        
+        # Determine color based on heat
+        if heat > 0.8:
+            # Very hot - yellow
+            h, s, v = instate['colors']['yellow']
+        elif heat > 0.5:
+            # Hot - orange
+            h, s, v = instate['colors']['orange']
+        else:
+            # Less hot - deep red
+            h, s, v = instate['colors']['deep_red']
+        
+        # Adjust brightness based on heat
+        v_adjusted = v * (0.6 + 0.4 * heat)
+        
+        r, g, b = hsv_to_rgb(h, s, v_adjusted)
+        alpha = 0.3 + 0.7 * heat
+        
+        buffer[i] = [r, g, b, alpha]
+    
+    # Add ember sparks with random distribution
+    for i in range(strip_length):
+        if random.random() < 0.005:  # 0.5% chance per pixel
+            h, s, v = instate['colors']['orange']
+            r, g, b = hsv_to_rgb(h, s, v)
+            spark_intensity = 0.8 + random.random() * 0.2
+            
+            buffer[i] = [r, g, b, spark_intensity]
 
 
 def OTO_curious_playful(instate, outstate):
@@ -2943,6 +2379,8 @@ def OTO_rage_lightning(instate, outstate):
             
             buffer[i] = [new_r, new_g, new_b, new_a]
             
+
+
 def OTO_contemplative_cosmic(instate, outstate):
     """
     Generator function that creates a contemplative cosmic-themed pattern.
@@ -2971,6 +2409,7 @@ def OTO_contemplative_cosmic(instate, outstate):
         instate['nebulae'] = {}         # Track large nebular regions
         instate['color_flows'] = {}     # Track flowing color smears
         instate['fireflies'] = {}       # Track moving fireflies
+        instate['active_strips'] = set()  # Track which strips are active
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -2997,6 +2436,21 @@ def OTO_contemplative_cosmic(instate, outstate):
     if instate['count'] == -1:
         # Cleanup when pattern is ending
         buffers.generator_alphas[name] = 0
+        
+        # Clean up all data structures
+        if 'stars' in instate:
+            instate['stars'].clear()
+        if 'splotches' in instate:
+            instate['splotches'].clear()
+        if 'nebulae' in instate:
+            instate['nebulae'].clear()
+        if 'color_flows' in instate:
+            instate['color_flows'].clear()
+        if 'fireflies' in instate:
+            instate['fireflies'].clear()
+        if 'active_strips' in instate:
+            instate['active_strips'].clear()
+            
         return
 
     # Get contemplative level from outstate (default to 0)
@@ -3030,6 +2484,26 @@ def OTO_contemplative_cosmic(instate, outstate):
     # Get all buffers for this generator
     pattern_buffers = buffers.get_all_buffers(name)
     
+    # Clean up strips that are no longer active
+    current_strip_ids = set(pattern_buffers.keys())
+    if 'active_strips' in instate:
+        removed_strips = instate['active_strips'] - current_strip_ids
+        for strip_id in removed_strips:
+            # Remove data for strips that are no longer active
+            if strip_id in instate['stars']:
+                del instate['stars'][strip_id]
+            if strip_id in instate['splotches']:
+                del instate['splotches'][strip_id]
+            if strip_id in instate['nebulae']:
+                del instate['nebulae'][strip_id]
+            if strip_id in instate['color_flows']:
+                del instate['color_flows'][strip_id]
+            if strip_id in instate['fireflies']:
+                del instate['fireflies'][strip_id]
+        
+        # Update active strips
+        instate['active_strips'] = current_strip_ids
+    
     # Process each buffer
     for strip_id, buffer in pattern_buffers.items():
         # Skip if strip doesn't exist in manager
@@ -3044,6 +2518,10 @@ def OTO_contemplative_cosmic(instate, outstate):
         
         # Initialize elements for this strip if not already done
         if strip_id not in instate['stars']:
+            # Add to active strips
+            if 'active_strips' in instate:
+                instate['active_strips'].add(strip_id)
+                
             # Create stars
             instate['stars'][strip_id] = []
             num_stars = max(3, strip_length // 5)  # Roughly 1 star per 10 pixels
@@ -3131,7 +2609,7 @@ def OTO_contemplative_cosmic(instate, outstate):
             
             # Create fireflies
             instate['fireflies'][strip_id] = []
-            num_fireflies = max(2, strip_length // 15)  # 1 per ~30 pixels
+            num_fireflies = max(2, strip_length // 15)  # 1 per ~15 pixels
             
             for _ in range(num_fireflies):
                 pos = np.random.randint(0, strip_length)
@@ -3139,14 +2617,14 @@ def OTO_contemplative_cosmic(instate, outstate):
                 
                 instate['fireflies'][strip_id].append({
                     'position': pos,
-                    'speed': 5.0 + np.random.random() * 15.0,  # 3-8 pixels per second (faster than other elements)
+                    'speed': 5.0 + np.random.random() * 15.0,  # 5-20 pixels per second
                     'direction': 1 if np.random.random() < 0.5 else -1,  # Random direction
                     'color': color,
                     'blink_rate': 0.5 + np.random.random() * 1.5,  # 0.5-2.0 Hz
                     'blink_offset': np.random.random() * 2 * np.pi,  # Random phase
-                    'blink_duration': 0.7 + np.random.random() * 0.8,  # 0.2-0.5 second blinks
+                    'blink_duration': 0.7 + np.random.random() * 0.8,  # 0.7-1.5 second blinks
                     'last_direction_change': current_time,
-                    'direction_change_interval': 2.0 + np.random.random() * 4.0  # 2-6 seconds between direction changes
+                    'direction_change_interval': 2.0 + np.random.random() * 4.0  # 2-6 seconds
                 })
         
         # Set up a new array to collect all color contributions for proper blending
@@ -3194,13 +2672,16 @@ def OTO_contemplative_cosmic(instate, outstate):
             noise = np.random.random(len(edge_profile)) * 0.15 - 0.075  # ±7.5% noise
             edge_profile = np.clip(edge_profile + noise, 0, 1)
             
-            # Apply to color arrays
-            for i, pos in enumerate(positions):
-                if edge_profile[i] > 0.01:  # Skip very low intensity
-                    r_values[pos] += base_r * edge_profile[i] * 0.7  # Reduce contribution to allow blending
-                    g_values[pos] += base_g * edge_profile[i] * 0.7
-                    b_values[pos] += base_b * edge_profile[i] * 0.7
-                    a_values[pos] += edge_profile[i] * 0.6  # More visible but still allows blending
+            # Apply to color arrays (vectorized)
+            mask = edge_profile > 0.01  # Skip very low intensity
+            if np.any(mask):
+                edge_masked = edge_profile[mask]
+                pos_masked = positions[mask]
+                
+                r_values[pos_masked] += base_r * edge_masked * 0.7
+                g_values[pos_masked] += base_g * edge_masked * 0.7
+                b_values[pos_masked] += base_b * edge_masked * 0.7
+                a_values[pos_masked] += edge_masked * 0.6
         
         # Render dynamic color flows (nebular smearing)
         for flow in instate['color_flows'][strip_id]:
@@ -3216,7 +2697,7 @@ def OTO_contemplative_cosmic(instate, outstate):
             h1, s1, v1 = instate['colors'][flow['color1']]
             h2, s2, v2 = instate['colors'][flow['color2']]
             
-            # Create flow pattern across the strip - vectorized for efficiency
+            # Create positions array
             positions = np.arange(strip_length)
             
             # Calculate normalized positions in the flow
@@ -3246,64 +2727,64 @@ def OTO_contemplative_cosmic(instate, outstate):
                 
                 # Work with the masked values for efficiency
                 flow_vals_masked = flow_values[mask]
+                masked_positions = positions[mask]
+                masked_intensities = intensities[mask]
                 
-                # Interpolate colors (vectorized)
-                h_values = (h1 * (1.0 - flow_vals_masked) + h2 * flow_vals_masked) % 1.0
-                s_values = s1 * (1.0 - flow_vals_masked) + s2 * flow_vals_masked
-                v_values = v1 * (1.0 - flow_vals_masked) + v2 * flow_vals_masked
-                
-                # Convert to RGB (need to do this per-pixel due to hsv_to_rgb limitations)
-                for i, idx in enumerate(positions[mask]):
-                    r, g, b = hsv_to_rgb(h_values[i], s_values[i], v_values[i])
+                # Interpolate colors and convert to RGB for each pixel
+                for i, pos in enumerate(masked_positions):
+                    flow_val = flow_vals_masked[i]
+                    intensity = masked_intensities[i]
                     
-                    # Calculate intensity
-                    intensity = intensities[idx]
+                    # Interpolate HSV
+                    h_value = (h1 * (1.0 - flow_val) + h2 * flow_val) % 1.0
+                    s_value = s1 * (1.0 - flow_val) + s2 * flow_val
+                    v_value = v1 * (1.0 - flow_val) + v2 * flow_val
                     
-                    # Add to color arrays with stronger contribution
-                    r_values[idx] += r * intensity * 0.8
-                    g_values[idx] += g * intensity * 0.8
-                    b_values[idx] += b * intensity * 0.8
-                    a_values[idx] += intensity * 0.7  # Stronger alpha
+                    # Convert to RGB
+                    r, g, b = hsv_to_rgb(h_value, s_value, v_value)
+                    
+                    # Add to color arrays
+                    r_values[pos] += r * intensity * 0.8
+                    g_values[pos] += g * intensity * 0.8
+                    b_values[pos] += b * intensity * 0.8
+                    a_values[pos] += intensity * 0.7
         
-        # Apply combined nebular effects to buffer
-        for i in range(strip_length):
-            if a_values[i] > 0:
-                # Ensure values are in valid range
-                r = min(1.0, r_values[i])
-                g = min(1.0, g_values[i])
-                b = min(1.0, b_values[i])
-                a = min(0.45, a_values[i])  # Cap alpha to allow for stars and fireflies
-                
-                # Set buffer with nebular colors
-                buffer[i] = [r, g, b, a]
+        # Apply combined nebular effects to buffer (vectorized)
+        mask = a_values > 0
+        if np.any(mask):
+            indices = np.where(mask)[0]
+            
+            # Ensure values are in valid range (vectorized)
+            r_values[indices] = np.minimum(1.0, r_values[indices])
+            g_values[indices] = np.minimum(1.0, g_values[indices])
+            b_values[indices] = np.minimum(1.0, b_values[indices])
+            a_values[indices] = np.minimum(0.45, a_values[indices])  # Cap alpha
+            
+            # Set buffer with nebular colors (needs loop due to buffer structure)
+            for i in indices:
+                buffer[i] = [r_values[i], g_values[i], b_values[i], a_values[i]]
         
         # Update and render stars
         for star in instate['stars'][strip_id]:
-            # Update position (slow movement)
+            # Update position
             star['position'] += star['movement_speed'] * star['direction'] * delta_time
-            
-            # Handle wrapping
             star['position'] %= strip_length
             
-            # Calculate blink effect
+            # Calculate brightness with blink effect
             blink_factor = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(current_time * star['blink_rate'] * 2 * np.pi + star['blink_offset']))
-            
-            # Calculate final brightness
             brightness = star['brightness'] * blink_factor
             
             # Draw the star
-            pos_int = int(star['position'])
+            pos = int(star['position'])
             
-            # Get base color (white)
+            # Get color and convert to RGB
             h, s, v = instate['colors']['white_star']
             r, g, b = hsv_to_rgb(h, s, v * brightness)
-            
-            # Set pixel with alpha based on brightness
             alpha = 0.3 + 0.7 * brightness
             
             # Add to buffer with additive blending
-            curr_r, curr_g, curr_b, curr_a = buffer[pos_int]
-            buffer[pos_int] = [
+            curr_r, curr_g, curr_b, curr_a = buffer[pos]
+            buffer[pos] = [
                 max(curr_r, r),
                 max(curr_g, g),
                 max(curr_b, b),
@@ -3313,7 +2794,7 @@ def OTO_contemplative_cosmic(instate, outstate):
             # Add small glow around bright stars
             if brightness > 0.7:
                 for offset in [-1, 1]:
-                    glow_pos = (pos_int + offset) % strip_length
+                    glow_pos = (pos + offset) % strip_length
                     glow_alpha = alpha * 0.5  # Half the brightness
                     
                     curr_r, curr_g, curr_b, curr_a = buffer[glow_pos]
@@ -3324,56 +2805,56 @@ def OTO_contemplative_cosmic(instate, outstate):
                         max(curr_a, glow_alpha)
                     ]
         
-        # Update and render green splotches
+        # Update and render splotches
         for splotch in instate['splotches'][strip_id]:
             # Update position
             splotch['position'] += splotch['speed'] * splotch['direction'] * delta_time
-            
-            # Handle wrapping
             splotch['position'] %= strip_length
             
             # Calculate pulse effect
             pulse_factor = 0.7 + 0.3 * (0.5 + 0.5 * np.sin(current_time * splotch['pulse_rate'] * 2 * np.pi + splotch['pulse_offset']))
-            
-            # Calculate final intensity
             intensity = splotch['intensity'] * pulse_factor
             
-            # Draw the splotch as a gradient
+            # Draw the splotch
             center = int(splotch['position'])
             size = splotch['size']
             
-            # Get color
-            h, s, v = instate['colors'][splotch['color']]
+            # Create pixel positions array with wrapping
+            positions = np.arange(center - size, center + size + 1) % strip_length
             
-            # Draw splotch with gradient falloff
-            for i in range(-size, size + 1):
-                pixel_pos = (center + i) % strip_length
+            # Calculate distances from center (normalized)
+            distances = np.abs(np.arange(-size, size + 1)) / size
+            
+            # Skip pixels that are too far
+            mask = distances <= 1.0
+            if np.any(mask):
+                positions = positions[mask]
+                distances = distances[mask]
                 
-                # Calculate distance from center (normalized)
-                dist = abs(i) / size
+                # Calculate intensities (vectorized)
+                pixel_intensities = intensity * (1.0 - distances**2)  # Quadratic falloff
                 
-                # Skip if too far
-                if dist > 1.0:
-                    continue
+                # Get color
+                h, s, v = instate['colors'][splotch['color']]
                 
-                # Calculate intensity based on distance from center
-                pixel_intensity = intensity * (1.0 - dist**2)  # Quadratic falloff
-                
-                # Calculate color
-                r, g, b = hsv_to_rgb(h, s, v * pixel_intensity)
-                alpha = pixel_intensity * 0.7  # Somewhat transparent
-                
-                # Add to buffer with additive blending for glow effect
-                curr_r, curr_g, curr_b, curr_a = buffer[pixel_pos]
-                buffer[pixel_pos] = [
-                    max(curr_r, r),
-                    max(curr_g, g),
-                    max(curr_b, b),
-                    max(curr_a, alpha)
-                ]
+                # Apply to each pixel
+                for i, pos in enumerate(positions):
+                    pixel_intensity = pixel_intensities[i]
+                    r, g, b = hsv_to_rgb(h, s, v * pixel_intensity)
+                    alpha = pixel_intensity * 0.7
+                    
+                    # Add to buffer with additive blending
+                    curr_r, curr_g, curr_b, curr_a = buffer[pos]
+                    buffer[pos] = [
+                        max(curr_r, r),
+                        max(curr_g, g),
+                        max(curr_b, b),
+                        max(curr_a, alpha)
+                    ]
         
-        # Update and render fireflies
+        # Update fireflies - use new list to avoid modifying while iterating
         new_fireflies = []
+        
         for firefly in instate['fireflies'][strip_id]:
             # Check if it's time to change direction
             if current_time - firefly['last_direction_change'] > firefly['direction_change_interval']:
@@ -3383,8 +2864,6 @@ def OTO_contemplative_cosmic(instate, outstate):
             
             # Update position
             firefly['position'] += firefly['speed'] * firefly['direction'] * delta_time
-            
-            # Handle wrapping
             firefly['position'] %= strip_length
             
             # Calculate blink effect - more distinct on/off for fireflies
@@ -3393,28 +2872,25 @@ def OTO_contemplative_cosmic(instate, outstate):
             # Fireflies have a brief "on" period
             is_on = blink_phase < firefly['blink_duration']
             
-            # Keep all fireflies
+            # Add to new list
             new_fireflies.append(firefly)
             
+            # Render visible fireflies
             if is_on:
-                # Draw the firefly when it's on
-                pos_int = int(firefly['position'])
+                # Draw the firefly
+                pos = int(firefly['position'])
                 
                 # Get color
                 h, s, v = instate['colors'][firefly['color']]
-                
-                # Make color brighter for fireflies
-                v = min(1.0, v * 1.2)
+                v = min(1.0, v * 1.2)  # Make brighter
                 
                 # Convert to RGB
                 r, g, b = hsv_to_rgb(h, s, v)
-                
-                # Set pixel with high alpha
                 alpha = 0.9
                 
                 # Add to buffer with additive blending
-                curr_r, curr_g, curr_b, curr_a = buffer[pos_int]
-                buffer[pos_int] = [
+                curr_r, curr_g, curr_b, curr_a = buffer[pos]
+                buffer[pos] = [
                     max(curr_r, r),
                     max(curr_g, g),
                     max(curr_b, b),
@@ -3423,7 +2899,7 @@ def OTO_contemplative_cosmic(instate, outstate):
                 
                 # Add small glow around firefly
                 for offset in [-1, 1]:
-                    glow_pos = (pos_int + offset) % strip_length
+                    glow_pos = (pos + offset) % strip_length
                     
                     # Glow is more green/yellow regardless of firefly color
                     glow_h, glow_s, glow_v = instate['colors']['green_yellow']
@@ -3440,9 +2916,9 @@ def OTO_contemplative_cosmic(instate, outstate):
                         max(curr_a, glow_alpha)
                     ]
         
-        # Update firefly list
+        # Replace firefly list - important to avoid memory leaks
         instate['fireflies'][strip_id] = new_fireflies
-        
+
 def OTO_neutral_positive(instate, outstate):
     """
     Generator function that creates a neutral/positive-themed pattern across all strips.
