@@ -15,7 +15,8 @@
         "Strip_usaage": "Secondary",      
         "REC_IP": "192.168.68.111",
         "Strip_num": 0,
-        "Direction": 1
+        "Direction": 1,
+        "Type":"RGB"
       }
     },
     {
@@ -33,7 +34,8 @@
         "Strip_usaage": "Primary",
         "REC_IP": "192.168.68.111",
         "Strip_num": 1,
-        "Direction": -1
+        "Direction": -1,
+        "Type":"RGB"
       }
     },    {
       "id": "right_ear_1",
@@ -50,7 +52,8 @@
         "Strip_usaage": "Secondary",      
         "REC_IP": "192.168.68.111",
         "Strip_num": 2,
-        "Direction": 1
+        "Direction": 1,
+        "Type":"RGB"
       }
     },
     {
@@ -62,13 +65,15 @@
         "center": [0.0, 0.0, 0.0],
         "radius": 5.0,
         "normal": [0.0, -1.0, 1],
-        "start_angle": 0.0
+        "start_angle": 0.0,
+        "Type":"RGB"
       },
       "metadata": {
         "Strip_usaage": "Primary",
         "REC_IP": "192.168.68.111",
         "Strip_num": 3,
-        "Direction": -1
+        "Direction": -1,
+        "Type":"RGB"
       }
     },
     {
@@ -86,7 +91,8 @@
       "Strip_usage": "Primary",
       "REC_IP": "192.168.68.111",
       "Strip_num":4,
-      "Direction": 1
+      "Direction": 1,
+        "Type":"RGB"
     }
   },
     {
@@ -102,7 +108,8 @@
         "Strip_usaage": "Secondary",
         "REC_IP": "192.168.68.112",
         "Strip_num": 5,
-        "Direction": 1
+        "Direction": 1,
+        "Type":"RGB"
       }
     },
     {
@@ -120,7 +127,8 @@
       "Strip_usage": "Primary",
       "REC_IP": "192.168.68.111",
       "Strip_num": 6,
-      "Direction": 1
+      "Direction": 1,
+        "Type":"RGB"
     }
   },
     {
@@ -136,7 +144,8 @@
         "Strip_usaage": "Secondary",
         "REC_IP": "192.168.68.112",
         "Strip_num": 7,
-        "Direction": 1
+        "Direction": 1,
+        "Type":"RGB"
       }
     }
      ,   {
@@ -154,7 +163,8 @@
         "Strip_usaage": "Secondary",      
         "REC_IP": "192.168.68.111",
         "Strip_num": 8,
-        "Direction": 1
+        "Direction": 1,
+        "Type":"RGB"
       }
     },
     {
@@ -172,7 +182,8 @@
         "Strip_usaage": "Primary",
         "REC_IP": "192.168.68.111",
         "Strip_num": 9,
-        "Direction": -1
+        "Direction": -1,
+        "Type":"RGB"
       }
     },
     {
@@ -190,7 +201,8 @@
         "Strip_usaage": "Primary",
         "REC_IP": "192.168.68.111",
         "Strip_num": 10,
-        "Direction": -1
+        "Direction": -1,
+        "Type":"RGB"
       }
     },
     {
@@ -208,7 +220,8 @@
       "Strip_usage": "Primary",
       "REC_IP": "192.168.68.111",
       "Strip_num": 11,
-      "Direction": 1
+      "Direction": 1,
+        "Type":"RGB"
     }
   },
     {
@@ -226,7 +239,8 @@
       "Strip_usage": "Primary",
       "REC_IP": "192.168.68.111",
       "Strip_num": 12,
-      "Direction": 1
+      "Direction": 1,
+        "Type":"RGBW"
     }
   },
     {
@@ -244,7 +258,8 @@
       "Strip_usage": "Primary",
       "REC_IP": "192.168.68.111",
       "Strip_num": 13,
-      "Direction": 1
+      "Direction": 1,
+        "Type":"RGBW"
     }
   }
   ]

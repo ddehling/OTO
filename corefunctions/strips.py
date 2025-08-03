@@ -299,22 +299,60 @@ class StripManager:
         # Create receivers config for each IP
         senders = {}
         for ip, strips in ip_strips.items():
-            # Calculate total pixel count for this IP
-            total_pixels = sum(strip.length for strip in strips)
-            
             # Sort strips by Strip_num to ensure correct order
             strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+            
+            # Calculate total pixel count for this IP
+            total_pixels = sum(strip.length for strip in strips)
             
             # Create receiver configuration with strip mapping info
             receiver_config = {
                 'ip': ip,
                 'pixel_count': total_pixels,
                 'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1)) 
-                            for strip in strips]
+                            for strip in strips],
+                'type': 'RGB'  # Default type will be overridden for each strip
             }
             
-            # Create sender for this IP
+            # Add type information to strip_info and prepare receiver config
+            rgb_strips = []
+            rgbw_strips = []
+            
+            # Prepare strip info with type information
+            strip_info = []
+            for strip in strips:
+                strip_type = strip.metadata.get('Type', 'RGB')
+                strip_info.append((
+                    strip.id, 
+                    strip.length, 
+                    strip.metadata.get('Direction', 1), 
+                    strip_type
+                ))
+                
+                # Group strips by type
+                if strip_type == 'RGB':
+                    rgb_strips.append(strip)
+                elif strip_type == 'RGBW':
+                    rgbw_strips.append(strip)
+            
+            # Update receiver config with the new strip_info
+            receiver_config['strip_info'] = strip_info
+            
+            # Create sender with combined configuration
             try:
+                # If we have both RGB and RGBW strips, ensure the sender knows about this
+                if rgb_strips and rgbw_strips:
+                    print(f"IP {ip} has both RGB and RGBW strips")
+                
+                # Set type based on what types of strips this receiver has
+                if rgb_strips and not rgbw_strips:
+                    receiver_config['type'] = 'RGB'
+                elif rgbw_strips and not rgb_strips:
+                    receiver_config['type'] = 'RGBW'
+                else:
+                    # If mixed, we'll need to handle this in the sender
+                    receiver_config['type'] = 'MIXED'
+                
                 sender = SACNPixelSender([receiver_config])
                 senders[ip] = {
                     'sender': sender,
