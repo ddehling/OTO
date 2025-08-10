@@ -17,7 +17,10 @@ class EnvironmentalSystem:
         self.progress = 0
         self.input_panel = InputPanel(title="OTO Control Panel")
         self.input_panel.values_changed.connect(self.on_input_values_changed)
-        
+        self.raw_values={"Danger":0,"Joyful":0,"Sad":0,"Angry":0,"Curious":0,"Passionate":0,"Rage":0,"Contemplative":0,"Neutral":0,"Awaken":0,"Inactive":1}
+        self.utility_names={"speed":1,"sound_in":0,"pad_left":0,"pad_right":0}
+        self.speed=0.995
+        self.sound_hist=np.zeros(100)
         # Store the latest input values
         self.input_values = self.input_panel.get_values()
 
@@ -103,15 +106,35 @@ class EnvironmentalSystem:
         self.smoothing_factor = max(0.0, min(1.0, factor))                
 
 
+    def parse_osc_messages(self):
+        """Parse OSC messages and update raw_values with the OSC address as key"""
+        messages = self.scheduler.get_osc_messages()
+        if messages != []:
+                    
+            #print(messages) 
+            for message in messages:
+                address = message[0].split('/')[-1]  # The OSC address (e.g., '/control/parameter1')
+                value = message[1]    # The value sent with the message
+                if address in self.utility_names:
+                    if address=="sound_in":
+                        np.roll(self.sound_hist,1)
+                        self.sound_hist[0]=value
+                    continue
+                # Update raw_values dictionary with the OSC address as key
+                #self.raw_values.append({address: value})
+                self.raw_values[address]=value
+                # Optional: Print the received OSC message for debugging
+                #print(f"Received OSC: {address} = {value}")
+        print(self.raw_values)
+        for key in self.raw_values:
+            self.smoothed_values[f"control_{key}"]=self.smoothed_values.get(f"control_{key}",0)*self.speed+self.raw_values[key]*(1-self.speed)
+        return self.raw_values
+
     def update(self):
         """Update the environmental system - should be called each frame"""
 
         self.current_time = time.time()
-       
-        # OSC handling
-        messages = self.scheduler.get_osc_messages()
-        if messages != []:
-            print(messages)  # Eventually want to pass these to the scheduler
+        self.parse_osc_messages()
             
         # Apply current parameters to scheduler state
         self.send_variables()
@@ -129,7 +152,7 @@ class EnvironmentalSystem:
 if __name__ == "__main__":
     scheduler = EventScheduler()
     env_system = EnvironmentalSystem(scheduler)
-    scheduler.setup_visualizer(False) 
+    scheduler.setup_visualizer(True) 
     # Start with summer bloom weather
    
     env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
@@ -156,10 +179,10 @@ if __name__ == "__main__":
             
             elapsed = current_time - lasttime
             sleep_time = max(0, FRAME_TIME - elapsed)
-            #time.sleep(sleep_time)
+            time.sleep(sleep_time)
 
             # Print stats if needed
-            print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
+            #print(["%.2f" % (1/(time.perf_counter()-lasttime)), "%.2f" % len(scheduler.active_events), len(scheduler.event_queue),"%.3f" %((lasttime-first_time)/3600)])
             lasttime = time.perf_counter()
 
     except KeyboardInterrupt:
