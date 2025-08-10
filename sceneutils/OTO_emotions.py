@@ -531,10 +531,10 @@ def OTO_sad_theme(instate, outstate):
         
         # Color palette (HSV values)
         instate['colors'] = {
-            'deep_blue': [0.6, 0.8, 0.4],  # Deep blue
-            'grey_blue': [0.6, 0.3, 0.5],  # Grey-blue
-            'light_grey': [0.0, 0.0, 0.7],  # Light grey
-            'dark_grey': [0.0, 0.0, 0.3],   # Dark grey
+            'deep_blue': [0.6, 0.8, 0.6],  # Deep blue
+            'grey_blue': [0.6, 0.3, 0.7],  # Grey-blue
+            'light_grey': [0.0, 0.0, 0.8],  # Light grey
+            'dark_grey': [0.0, 0.0, 0.5],   # Dark grey
             'white': [0.0, 0.0, 0.9]        # Almost white
         }
         
@@ -716,14 +716,14 @@ def OTO_sad_theme(instate, outstate):
                         drop['position'] = 0  # Wrap to left end
                         drop['direction'] = 1  # Set direction to right
                         drop['color_phase'] = 0.0  # Reset to blue
-                        drop['alpha'] = 0.7 + np.random.random() * 0.3  # New random alpha
+                        drop['alpha'] = 0.9 + np.random.random() * 0.1  # New random alpha
                         drop['life_cycles'] = 0  # Reset cycle count for consistent respawning
                     elif drop['position'] < 0:
                         # Reached left end
                         drop['position'] = strip_length - 1  # Wrap to right end
                         drop['direction'] = -1  # Set direction to left
                         drop['color_phase'] = 0.0  # Reset to blue
-                        drop['alpha'] = 0.7 + np.random.random() * 0.3  # New random alpha
+                        drop['alpha'] = 0.9 + np.random.random() * 0.1  # New random alpha
                         drop['life_cycles'] = 0  # Reset cycle count for consistent respawning
                     
                     # Check if drop has reached the middle

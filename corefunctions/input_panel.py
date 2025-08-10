@@ -36,6 +36,7 @@ class InputPanel(QMainWindow):
         self.sliders = {}
         slider_names = ["Intensity", "Speed","Sensor", "Danger","Joyful","Sad","Angry","Curious","Passionate","Rage","Contemplative","Neutral"]
         
+        
         for i, name in enumerate(slider_names):
             # Create a horizontal layout for each slider
             row_layout = QHBoxLayout()
