@@ -306,42 +306,83 @@ class StripManager:
             rgb_strips = [s for s in strips if s.metadata.get('Type', 'RGB') == 'RGB']
             rgbw_strips = [s for s in strips if s.metadata.get('Type', 'RGBW') == 'RGBW']
             dmx_strips = [s for s in strips if s.metadata.get('Type', 'DMX') == 'DMX']
+            rgb4_strips = [s for s in strips if s.metadata.get('Type', 'RGB4') == 'RGB4']
             
             # Prepare receivers list to handle multiple types per IP
             receivers = []
             
             # Add RGB receiver if needed
             if rgb_strips:
+                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in rgb_strips)
                 rgb_receiver = {
                     'ip': ip,
                     'pixel_count': sum(strip.length for strip in rgb_strips),
                     'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGB') 
                                 for strip in rgb_strips],
-                    'type': 'RGB'
+                    'type': 'RGB',
+                    'strip_ids': [s.id for s in rgb_strips],
+                    'strip_num_start': min_strip_num
                 }
                 receivers.append(rgb_receiver)
             
             # Add RGBW receiver if needed
             if rgbw_strips:
+                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in rgbw_strips)
                 rgbw_receiver = {
                     'ip': ip,
                     'pixel_count': sum(strip.length for strip in rgbw_strips),
                     'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGBW') 
                                 for strip in rgbw_strips],
-                    'type': 'RGBW'
+                    'type': 'RGBW',
+                    'strip_ids': [s.id for s in rgbw_strips],
+                    'strip_num_start': min_strip_num
                 }
                 receivers.append(rgbw_receiver)
             
             # Add DMX receiver if needed
             if dmx_strips:
+                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in dmx_strips)
                 dmx_receiver = {
                     'ip': ip,
                     'pixel_count': sum(strip.length for strip in dmx_strips),
                     'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'DMX') 
                                 for strip in dmx_strips],
-                    'type': 'DMX'
+                    'type': 'DMX',
+                    'strip_ids': [s.id for s in dmx_strips],
+                    'strip_num_start': min_strip_num
                 }
                 receivers.append(dmx_receiver)
+            
+            # Handle RGB4 strips - group by Output
+            if rgb4_strips:
+                # Group RGB4 strips by Output
+                output_groups = {}
+                for strip in rgb4_strips:
+                    output = strip.metadata.get('Output', 'default')
+                    if output not in output_groups:
+                        output_groups[output] = []
+                    output_groups[output].append(strip)
+                
+                # Create a receiver for each output group
+                for output, group_strips in output_groups.items():
+                    # Sort strips within output group by Strip_num
+                    group_strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+                    min_strip_num = min(s.metadata.get('Strip_num', 0) for s in group_strips)
+                    
+                    rgb4_receiver = {
+                        'ip': ip,
+                        'pixel_count': sum(strip.length for strip in group_strips),
+                        'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGB4') 
+                                    for strip in group_strips],
+                        'type': 'RGB4',
+                        'output': output,
+                        'strip_ids': [strip.id for strip in group_strips],
+                        'strip_num_start': min_strip_num
+                    }
+                    receivers.append(rgb4_receiver)
+            
+            # Sort receivers by the minimum Strip_num to maintain order
+            receivers.sort(key=lambda r: r.get('strip_num_start', float('inf')))
             
             # Create strip info for all strips on this IP
             all_strip_info = []
@@ -359,6 +400,19 @@ class StripManager:
             if rgb_strips: strip_types.append(f"RGB ({sum(s.length for s in rgb_strips)} pixels)")
             if rgbw_strips: strip_types.append(f"RGBW ({sum(s.length for s in rgbw_strips)} pixels)")
             if dmx_strips: strip_types.append(f"DMX ({sum(s.length for s in dmx_strips)} pixels)")
+            
+            # Show RGB4 strips by output
+            if rgb4_strips:
+                outputs = {}
+                for s in rgb4_strips:
+                    output = s.metadata.get('Output', 'default')
+                    if output not in outputs:
+                        outputs[output] = 0
+                    outputs[output] += s.length
+                
+                for output, count in outputs.items():
+                    strip_types.append(f"RGB4 Output {output} ({count} pixels)")
+            
             print(f"IP {ip} has: {', '.join(strip_types)}")
             
             try:

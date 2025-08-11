@@ -16,7 +16,8 @@
         "REC_IP": "192.168.68.111",
         "Strip_num": 0,
         "Direction": 1,
-        "Type":"RGB"
+        "Output":0,
+        "Type":"RGB4"
       }
     },
     {
@@ -35,7 +36,8 @@
         "REC_IP": "192.168.68.111",
         "Strip_num": 1,
         "Direction": -1,
-        "Type":"RGB"
+        "Output":1,
+        "Type":"RGB4"
       }
     },    {
       "id": "right_ear_1",
@@ -142,7 +144,7 @@
       },
       "metadata": {
         "Strip_usaage": "Secondary",
-        "REC_IP": "192.168.68.112",
+        "REC_IP": "192.168.68.111",
         "Strip_num": 7,
         "Direction": 1,
         "Type":"RGB"
@@ -260,6 +262,25 @@
       "Strip_num": 13,
       "Direction": 1,
         "Type":"RGBW"
+    }
+  },
+    {
+    "id": "Spots",
+    "length": 6,
+    "groups": ["spots"],
+    "type": "arc",
+    "position": {
+      "start": [0.0, -40.0, -100.0],
+      "end": [0.0, 40.0, -100.0],
+      "arc_degrees": 270,
+      "normal": [0.0, 0.0, 1.0]
+    },
+    "metadata": {
+      "Strip_usage": "Primary",
+      "REC_IP": "192.168.68.111",
+      "Strip_num": 14,
+      "Direction": 1,
+        "Type":"DMX"
     }
   }
   ]

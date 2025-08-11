@@ -1,6 +1,8 @@
 import numpy as np
 from sacn import sACNsender
 import math
+
+
 class SACNPixelSender:
     def __init__(self, receivers, start_universe=1):
         """
@@ -13,62 +15,109 @@ class SACNPixelSender:
 
         # Set up universes for each receiver
         self.receiver_universes = []
+        self.receiver_to_output_map = []  # Map each receiver to its output group
         universe_counter = start_universe
         
-        # First process RGB strips
-        rgb_receivers = [r for r in receivers if r.get('type', 'RGB') == 'RGB']
-        if rgb_receivers:
-            print(f"Setting up RGB universes starting at {universe_counter}")
-            for receiver in rgb_receivers:
+        # Sort receivers by strip number (or any other specified order)
+        # This ensures that RGB4 strips will be allocated universes in order
+        # based on their Strip_num rather than coming after all other types
+        sorted_receivers = sorted(receivers, key=lambda r: r.get('strip_num_start', float('inf')))
+        
+        # Process all receivers in order
+        for receiver in sorted_receivers:
+            receiver_type = receiver.get('type', 'RGB')
+            
+            if receiver_type == 'RGB':
                 # Each RGB universe can hold 170 pixels (510 bytes)
                 universe_count = math.ceil(receiver['pixel_count'] / 170)
+                print(f"Setting up RGB universes for strips {receiver.get('strip_ids', [])} starting at {universe_counter}")
                 receiver_universes = list(range(universe_counter, universe_counter + universe_count))
                 self.receiver_universes.append(receiver_universes)
+                self.receiver_to_output_map.append(None)  # No output grouping for regular RGB
                 universe_counter += universe_count
 
-                # Activate universes for this receiver
-                for universe in receiver_universes:
-                    self.sender.activate_output(universe)
-                    self.sender[universe].destination = receiver['ip']
-        
-        # Calculate the start for RGBW universes
-        rgbw_start_universe = universe_counter
-        
-        # Then process RGBW strips
-        rgbw_receivers = [r for r in receivers if r.get('type', 'RGBW') == 'RGBW']
-        if rgbw_receivers:
-            print(f"Setting up RGBW universes starting at {rgbw_start_universe}")
-            for receiver in rgbw_receivers:
+            elif receiver_type == 'RGBW':
                 # Each RGBW universe can hold 128 pixels (512 bytes)
                 universe_count = math.ceil(receiver['pixel_count'] / 128)
+                print(f"Setting up RGBW universes for strips {receiver.get('strip_ids', [])} starting at {universe_counter}")
                 receiver_universes = list(range(universe_counter, universe_counter + universe_count))
                 self.receiver_universes.append(receiver_universes)
+                self.receiver_to_output_map.append(None)  # No output grouping for RGBW
                 universe_counter += universe_count
 
-                # Activate universes for this receiver
-                for universe in receiver_universes:
-                    self.sender.activate_output(universe)
-                    self.sender[universe].destination = receiver['ip']
-
-        # Calculate the start for DMX universes
-        dmx_start_universe = universe_counter
-        
-        # Finally process DMX strips
-        dmx_receivers = [r for r in receivers if r.get('type', 'DMX') == 'DMX']
-        if dmx_receivers:
-            print(f"Setting up DMX universes starting at {dmx_start_universe}")
-            for receiver in dmx_receivers:
+            elif receiver_type == 'DMX':
                 # Each DMX universe can hold 73 pixels (511 bytes, leaving 1 byte unused)
                 universe_count = math.ceil(receiver['pixel_count'] / 73)
+                print(f"Setting up DMX universes for strips {receiver.get('strip_ids', [])} starting at {universe_counter}")
                 receiver_universes = list(range(universe_counter, universe_counter + universe_count))
                 self.receiver_universes.append(receiver_universes)
+                self.receiver_to_output_map.append(None)  # No output grouping for DMX
                 universe_counter += universe_count
+                
+            elif receiver_type == 'RGB4':
+                output = receiver.get('output', 'default')
+                print(f"Setting up RGB4 universes for output {output} strips {receiver.get('strip_ids', [])} starting at {universe_counter}")
+                
+                # Calculate total bytes needed for this RGB4 receiver
+                receiver_bytes = receiver['pixel_count'] * 3
+                universe_count = math.ceil(receiver_bytes / 510)  # 510 bytes per universe
+                
+                receiver_universes = list(range(universe_counter, universe_counter + universe_count))
+                self.receiver_universes.append(receiver_universes)
+                self.receiver_to_output_map.append(output)  # Store output group
+                universe_counter += universe_count
+            
+            # Activate universes for this receiver
+            for universe in receiver_universes:
+                self.sender.activate_output(universe)
+                self.sender[universe].destination = receiver['ip']
 
-                # Activate universes for this receiver
-                for universe in receiver_universes:
-                    self.sender.activate_output(universe)
-                    self.sender[universe].destination = receiver['ip']
-
+        
+        # # Process RGB4 strips - group by output
+        # rgb4_start_universe = universe_counter
+        # rgb4_receivers = [r for r in receivers if r.get('type', 'RGB4') == 'RGB4']
+        
+        # if rgb4_receivers:
+        #     # Group RGB4 receivers by output
+        #     output_groups = {}
+        #     for receiver in rgb4_receivers:
+        #         output = receiver.get('output', 'default')
+        #         if output not in output_groups:
+        #             output_groups[output] = []
+        #         output_groups[output].append(receiver)
+            
+        #     # Process each output group
+        #     for output, group_receivers in output_groups.items():
+        #         print(f"Setting up RGB4 universes for output {output} starting at universe {universe_counter}")
+                
+        #         # Calculate total bytes needed for this output group
+        #         total_bytes = sum(receiver['pixel_count'] * 3 for receiver in group_receivers)
+        #         universe_count = math.ceil(total_bytes / 510)  # 510 bytes per universe (170 pixels * 3)
+                
+        #         # Assign universes to each receiver in this output group
+        #         bytes_used = 0
+        #         for receiver in group_receivers:
+        #             receiver_bytes = receiver['pixel_count'] * 3
+                    
+        #             # Calculate which universes this receiver spans
+        #             start_universe = universe_counter + (bytes_used // 510)
+        #             end_universe = universe_counter + ((bytes_used + receiver_bytes - 1) // 510)
+                    
+        #             receiver_universes = list(range(start_universe, end_universe + 1))
+        #             self.receiver_universes.append(receiver_universes)
+        #             self.receiver_to_output_map.append(output)  # Store output group
+                    
+        #             # Activate universes for this receiver
+        #             for universe in receiver_universes:
+        #                 if universe not in self.sender.get_active_outputs():
+        #                     self.sender.activate_output(universe)
+        #                     self.sender[universe].destination = receiver['ip']
+                    
+        #             bytes_used += receiver_bytes
+                
+        #         # Move universe counter to next available universe
+        #         universe_counter += universe_count
+                
     def create_mask(self, height, width):
         """
         Creates a binary mask showing which pixels are mapped by receivers.
@@ -120,12 +169,30 @@ class SACNPixelSender:
         :param strip_info: List of tuples (strip_id, length, direction, type)
         """
         gamma = 2.2
-        for receiver, universes in zip(self.receivers, self.receiver_universes):
+        
+        # Group RGB4 receivers by output
+        rgb4_by_output = {}
+        rgb4_indices = []
+        
+        # Identify RGB4 receivers and group them by output
+        for i, (receiver, output_group) in enumerate(zip(self.receivers, self.receiver_to_output_map)):
+            if receiver.get('type') == 'RGB4' and output_group is not None:
+                if output_group not in rgb4_by_output:
+                    rgb4_by_output[output_group] = []
+                rgb4_by_output[output_group].append(i)
+                rgb4_indices.append(i)
+        
+        # Process normal receivers (RGB, RGBW, DMX)
+        for i, (receiver, universes) in enumerate(zip(self.receivers, self.receiver_universes)):
+            # Skip RGB4 receivers, they'll be handled separately
+            if i in rgb4_indices:
+                continue
+                
+            # Get the receiver type
+            receiver_type = receiver.get('type', 'RGB')
+            
             # Concatenate all strip data for this receiver
             all_pixel_data = []
-            
-            # Get the receiver type (RGB, RGBW, or DMX)
-            receiver_type = receiver.get('type', 'RGB')
             
             for strip_id, length, direction, strip_type in strip_info:
                 # Skip if strip type doesn't match receiver type
@@ -151,60 +218,136 @@ class SACNPixelSender:
             # Concatenate all strips
             receiver_data = np.concatenate(all_pixel_data)
             
-            # Calculate pixels per universe based on type
+            # Handle different pixel types
             if receiver_type == 'RGB':
-                pixels_per_universe = 170  # 170 RGB pixels per universe
+                pixels_per_universe = 170
+                self._send_rgb_data(receiver_data, universes, pixels_per_universe)
             elif receiver_type == 'RGBW':
-                pixels_per_universe = 128  # 128 RGBW pixels per universe
-            else:  # DMX
-                pixels_per_universe = 73   # 73 DMX pixels per universe
+                pixels_per_universe = 128
+                self._send_rgbw_data(receiver_data, universes, pixels_per_universe)
+            elif receiver_type == 'DMX':
+                pixels_per_universe = 73
+                self._send_dmx_data(receiver_data, universes, pixels_per_universe)
+        
+        # Now process RGB4 receivers by output group
+        for output, indices in rgb4_by_output.items():
+            # Collect all RGB4 data for this output group
+            output_data = []
             
-            # Send data in chunks
-            for i, universe in enumerate(universes):
-                start = i * pixels_per_universe
-                end = min(start + pixels_per_universe, len(receiver_data))
+            for receiver_idx in indices:
+                receiver = self.receivers[receiver_idx]
                 
-                # Check if we have enough data
-                if start < len(receiver_data):
-                    # Get the data for this universe
-                    universe_data = receiver_data[start:end]
+                # Get all strips for this receiver
+                receiver_strips = []
+                for strip_id, length, direction, strip_type in strip_info:
+                    if strip_type == 'RGB4' and strip_id in receiver.get('strip_ids', []):
+                        buffer = output_buffers[strip_id]
+                        rgb_data = (np.power(buffer[:, :3], gamma) * 255).astype(np.uint8)
+                        
+                        if direction == -1:
+                            rgb_data = rgb_data[::-1]
+                            
+                        receiver_strips.append(rgb_data)
+                
+                if receiver_strips:
+                    output_data.append(np.concatenate(receiver_strips))
+            
+            if not output_data:
+                continue
+                
+            # Concatenate all data for this output group
+            all_output_data = np.concatenate(output_data)
+            
+            # Flatten the RGB data
+            all_bytes = all_output_data.flatten()
+            
+            # Send across universes (up to 510 bytes per universe)
+            universes = []
+            for receiver_idx in indices:
+                universes.extend(self.receiver_universes[receiver_idx])
+            universes = sorted(set(universes))  # Unique, sorted universes
+            
+            for i, universe in enumerate(universes):
+                start_byte = i * 510
+                end_byte = min(start_byte + 510, len(all_bytes))
+                
+                if start_byte < len(all_bytes):
+                    # Get bytes for this universe
+                    universe_bytes = all_bytes[start_byte:end_byte]
                     
-                    if receiver_type == 'RGB':
-                        # Flatten the RGB data
-                        universe_data = universe_data.flatten()
-                        
-                        # Pad the last universe if necessary
-                        if universe_data.size < 510:  # 510 = 170 pixels * 3 bytes
-                            universe_data = np.pad(universe_data, (0, 510 - universe_data.size), 'constant')
-                            
-                    elif receiver_type == 'RGBW':
-                        # Create RGBW data with W set to 0
-                        rgbw_data = np.zeros((universe_data.shape[0], 4), dtype=np.uint8)
-                        rgbw_data[:, :3] = universe_data  # Set RGB components
-                        
-                        # Flatten the RGBW data
-                        universe_data = rgbw_data.flatten()
-                        
-                        # Pad if necessary
-                        if universe_data.size < 512:  # 512 = 128 pixels * 4 bytes
-                            universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
-                            
-                    else:  # DMX
-                        # Create DMX data: [255, R, G, B, 0, 0, 0] for each pixel
-                        dmx_data = np.zeros((universe_data.shape[0], 7), dtype=np.uint8)
-                        dmx_data[:, 0] = 255  # First byte is always 255
-                        dmx_data[:, 1:4] = universe_data  # Set RGB components
-                        # Bytes 4-6 are already 0
-                        
-                        # Flatten the DMX data
-                        universe_data = dmx_data.flatten()
-                        
-                        # Pad if necessary (ensure we have a full universe of 512 bytes)
-                        if universe_data.size < 512:
-                            universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
+                    # Pad if needed
+                    if len(universe_bytes) < 510:
+                        universe_bytes = np.pad(universe_bytes, (0, 510 - len(universe_bytes)), 'constant')
                     
                     # Send the data
-                    self.sender[universe].dmx_data = universe_data.tobytes()
+                    self.sender[universe].dmx_data = universe_bytes.tobytes()
+
+    def _send_rgb_data(self, receiver_data, universes, pixels_per_universe):
+        """Send RGB data (helper method)"""
+        for i, universe in enumerate(universes):
+            start = i * pixels_per_universe
+            end = min(start + pixels_per_universe, len(receiver_data))
+            
+            if start < len(receiver_data):
+                # Get data for this universe
+                universe_data = receiver_data[start:end].flatten()
+                
+                # Pad if necessary
+                if universe_data.size < 510:  # 510 = 170 pixels * 3 bytes
+                    universe_data = np.pad(universe_data, (0, 510 - universe_data.size), 'constant')
+                
+                # Send the data
+                self.sender[universe].dmx_data = universe_data.tobytes()
+
+    def _send_rgbw_data(self, receiver_data, universes, pixels_per_universe):
+        """Send RGBW data (helper method)"""
+        for i, universe in enumerate(universes):
+            start = i * pixels_per_universe
+            end = min(start + pixels_per_universe, len(receiver_data))
+            
+            if start < len(receiver_data):
+                # Get data for this universe
+                universe_data = receiver_data[start:end]
+                
+                # Create RGBW data with W set to 0
+                rgbw_data = np.zeros((universe_data.shape[0], 4), dtype=np.uint8)
+                rgbw_data[:, :3] = universe_data  # Set RGB components
+                
+                # Flatten the RGBW data
+                universe_data = rgbw_data.flatten()
+                
+                # Pad if necessary
+                if universe_data.size < 512:  # 512 = 128 pixels * 4 bytes
+                    universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
+                
+                # Send the data
+                self.sender[universe].dmx_data = universe_data.tobytes()
+
+    def _send_dmx_data(self, receiver_data, universes, pixels_per_universe):
+        """Send DMX data (helper method)"""
+        for i, universe in enumerate(universes):
+            start = i * pixels_per_universe
+            end = min(start + pixels_per_universe, len(receiver_data))
+            
+            if start < len(receiver_data):
+                # Get data for this universe
+                universe_data = receiver_data[start:end]
+                
+                # Create DMX data: [255, R, G, B, 0, 0, 0] for each pixel
+                dmx_data = np.zeros((universe_data.shape[0], 7), dtype=np.uint8)
+                dmx_data[:, 0] = 255  # First byte is always 255
+                dmx_data[:, 1:4] = universe_data  # Set RGB components
+                # Bytes 4-6 are already 0
+                
+                # Flatten the DMX data
+                universe_data = dmx_data.flatten()
+                
+                # Pad if necessary
+                if universe_data.size < 512:
+                    universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
+                
+                # Send the data
+                self.sender[universe].dmx_data = universe_data.tobytes()
 
     def close(self):
         """

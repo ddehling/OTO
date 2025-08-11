@@ -113,8 +113,11 @@ class EnvironmentalSystem:
                     
             #print(messages) 
             for message in messages:
-                address = message[0].split('/')[-1]  # The OSC address (e.g., '/control/parameter1')
+                type=message[0].split('/')[1]
+                address = message[0].split('/')[2]  # The OSC address (e.g., '/control/parameter1')
                 value = message[1]    # The value sent with the message
+                if type == "state":
+                    continue
                 if address in self.utility_names:
                     if address=="sound_in":
                         np.roll(self.sound_hist,1)
@@ -125,7 +128,7 @@ class EnvironmentalSystem:
                 self.raw_values[address]=value
                 # Optional: Print the received OSC message for debugging
                 #print(f"Received OSC: {address} = {value}")
-        print(self.raw_values)
+        #print(self.raw_values)
         for key in self.raw_values:
             self.smoothed_values[f"control_{key}"]=self.smoothed_values.get(f"control_{key}",0)*self.speed+self.raw_values[key]*(1-self.speed)
         return self.raw_values
