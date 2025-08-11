@@ -49,9 +49,11 @@ def OTO_inactive_pattern_cycle(instate, outstate):
         return
 
     # Set main generator alpha to full
-    buffers.generator_alphas[name] = 1.0
+    
     global_alpha=outstate.get('control_mode_inactive', 1)
+    buffers.generator_alphas[name] = global_alpha
     if global_alpha<0.01:   
+       
         return
     
     # Update current pattern position based on time

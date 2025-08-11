@@ -17,8 +17,9 @@ class EnvironmentalSystem:
         self.progress = 0
         self.input_panel = InputPanel(title="OTO Control Panel")
         self.input_panel.values_changed.connect(self.on_input_values_changed)
-        self.raw_values={"Danger":0,"Joyful":0,"Sad":0,"Angry":0,"Curious":0,"Passionate":0,"Rage":0,"Contemplative":0,"Neutral":0,"Awaken":0,"Inactive":1}
+        self.raw_values={"Danger":0,"Joyful":0,"Sad":0,"Angry":0,"Curious":0,"Passionate":0,"Rage":0,"Contemplative":0,"Neutral":0}
         self.utility_names={"speed":1,"sound_in":0,"pad_left":0,"pad_right":0}
+        self.state={"Awaken":0,"Inactive":1,"Talking":0,"Thinking":0}
         self.speed=0.995
         self.sound_hist=np.zeros(100)
         # Store the latest input values
@@ -115,9 +116,12 @@ class EnvironmentalSystem:
             for message in messages:
                 type=message[0].split('/')[1]
                 address = message[0].split('/')[2]  # The OSC address (e.g., '/control/parameter1')
-                value = message[1]    # The value sent with the message
+                value = float(message[1][0]) # The value sent with the message
+                #print(value)
                 if type == "state":
-                    continue
+                    self.state[type]=value
+                if type=="emotions":
+                    self.raw_values[type]=value/10.0
                 if address in self.utility_names:
                     if address=="sound_in":
                         np.roll(self.sound_hist,1)
@@ -125,12 +129,15 @@ class EnvironmentalSystem:
                     continue
                 # Update raw_values dictionary with the OSC address as key
                 #self.raw_values.append({address: value})
-                self.raw_values[address]=value
+                #self.raw_values[address]=value
                 # Optional: Print the received OSC message for debugging
                 #print(f"Received OSC: {address} = {value}")
         #print(self.raw_values)
         for key in self.raw_values:
-            self.smoothed_values[f"control_{key}"]=self.smoothed_values.get(f"control_{key}",0)*self.speed+self.raw_values[key]*(1-self.speed)
+            self.smoothed_values[key]=self.smoothed_values.get(key,0)*self.speed+self.raw_values[key]*(1-self.speed)
+
+        for key in self.state:
+            self.smoothed_values[key]=self.smoothed_values.get(key,0)*self.speed+self.state[key]*(1-self.speed)
         return self.raw_values
 
     def update(self):

@@ -692,7 +692,7 @@ class BufferManager:
             for generator_name, gen_buffers in sorted_generators:
                 # Skip generators with zero alpha
                 generator_alpha = self.generator_alphas.get(generator_name, 1.0)
-                if generator_alpha <= 0.0:
+                if generator_alpha <= 0.01:
                     continue
                     
                 if strip_id not in gen_buffers:

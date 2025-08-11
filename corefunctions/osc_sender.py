@@ -18,10 +18,10 @@ def main():
     print("Press Ctrl+C to stop")
     
     message_types = [
-        ("/test/brightness", lambda: random.uniform(0.0, 1.0)),
-        ("/test/color", lambda: [random.random(), random.random(), random.random()]),
-        ("/test/trigger", lambda: "effect_" + str(random.randint(1, 5))),
-        ("/test/tempo", lambda: random.randint(60, 180)),
+        ("/emotions/brightness", lambda: random.randint(0, 10)),
+        #("/test/color", lambda: [random.random(), random.random(), random.random()]),
+        #("/test/trigger", lambda: "effect_" + str(random.randint(1, 5))),
+        ("/state/tempo", lambda: random.uniform(0, 1.0)),
     ]
     
     try:
