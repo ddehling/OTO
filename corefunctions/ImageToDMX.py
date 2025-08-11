@@ -31,7 +31,6 @@ class SACNPixelSender:
                     self.sender.activate_output(universe)
                     self.sender[universe].destination = receiver['ip']
         
-        # If the last RGB universe is partially filled, we need to start RGBW on the next universe
         # Calculate the start for RGBW universes
         rgbw_start_universe = universe_counter
         
@@ -42,6 +41,25 @@ class SACNPixelSender:
             for receiver in rgbw_receivers:
                 # Each RGBW universe can hold 128 pixels (512 bytes)
                 universe_count = math.ceil(receiver['pixel_count'] / 128)
+                receiver_universes = list(range(universe_counter, universe_counter + universe_count))
+                self.receiver_universes.append(receiver_universes)
+                universe_counter += universe_count
+
+                # Activate universes for this receiver
+                for universe in receiver_universes:
+                    self.sender.activate_output(universe)
+                    self.sender[universe].destination = receiver['ip']
+
+        # Calculate the start for DMX universes
+        dmx_start_universe = universe_counter
+        
+        # Finally process DMX strips
+        dmx_receivers = [r for r in receivers if r.get('type', 'DMX') == 'DMX']
+        if dmx_receivers:
+            print(f"Setting up DMX universes starting at {dmx_start_universe}")
+            for receiver in dmx_receivers:
+                # Each DMX universe can hold 73 pixels (511 bytes, leaving 1 byte unused)
+                universe_count = math.ceil(receiver['pixel_count'] / 73)
                 receiver_universes = list(range(universe_counter, universe_counter + universe_count))
                 self.receiver_universes.append(receiver_universes)
                 universe_counter += universe_count
@@ -106,7 +124,7 @@ class SACNPixelSender:
             # Concatenate all strip data for this receiver
             all_pixel_data = []
             
-            # Get the receiver type (RGB or RGBW)
+            # Get the receiver type (RGB, RGBW, or DMX)
             receiver_type = receiver.get('type', 'RGB')
             
             for strip_id, length, direction, strip_type in strip_info:
@@ -134,9 +152,14 @@ class SACNPixelSender:
             receiver_data = np.concatenate(all_pixel_data)
             
             # Calculate pixels per universe based on type
-            pixels_per_universe = 170 if receiver_type == 'RGB' else 128
+            if receiver_type == 'RGB':
+                pixels_per_universe = 170  # 170 RGB pixels per universe
+            elif receiver_type == 'RGBW':
+                pixels_per_universe = 128  # 128 RGBW pixels per universe
+            else:  # DMX
+                pixels_per_universe = 73   # 73 DMX pixels per universe
             
-            # Send data in chunks (170 pixels for RGB, 128 pixels for RGBW)
+            # Send data in chunks
             for i, universe in enumerate(universes):
                 start = i * pixels_per_universe
                 end = min(start + pixels_per_universe, len(receiver_data))
@@ -144,27 +167,40 @@ class SACNPixelSender:
                 # Check if we have enough data
                 if start < len(receiver_data):
                     # Get the data for this universe
-                    universe_data = receiver_data[start:end].flatten()
+                    universe_data = receiver_data[start:end]
                     
                     if receiver_type == 'RGB':
+                        # Flatten the RGB data
+                        universe_data = universe_data.flatten()
+                        
                         # Pad the last universe if necessary
                         if universe_data.size < 510:  # 510 = 170 pixels * 3 bytes
                             universe_data = np.pad(universe_data, (0, 510 - universe_data.size), 'constant')
-                    else:  # RGBW
-                        # Add W component (0) for each pixel and reshape
-                        # First, determine how many complete pixels we have
-                        num_complete_pixels = universe_data.size // 3
-                        rgb_data = universe_data[:num_complete_pixels*3].reshape(-1, 3)
-                        
+                            
+                    elif receiver_type == 'RGBW':
                         # Create RGBW data with W set to 0
-                        rgbw_data = np.zeros((rgb_data.shape[0], 4), dtype=np.uint8)
-                        rgbw_data[:, :3] = rgb_data  # Set RGB components
+                        rgbw_data = np.zeros((universe_data.shape[0], 4), dtype=np.uint8)
+                        rgbw_data[:, :3] = universe_data  # Set RGB components
                         
                         # Flatten the RGBW data
                         universe_data = rgbw_data.flatten()
                         
                         # Pad if necessary
                         if universe_data.size < 512:  # 512 = 128 pixels * 4 bytes
+                            universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
+                            
+                    else:  # DMX
+                        # Create DMX data: [255, R, G, B, 0, 0, 0] for each pixel
+                        dmx_data = np.zeros((universe_data.shape[0], 7), dtype=np.uint8)
+                        dmx_data[:, 0] = 255  # First byte is always 255
+                        dmx_data[:, 1:4] = universe_data  # Set RGB components
+                        # Bytes 4-6 are already 0
+                        
+                        # Flatten the DMX data
+                        universe_data = dmx_data.flatten()
+                        
+                        # Pad if necessary (ensure we have a full universe of 512 bytes)
+                        if universe_data.size < 512:
                             universe_data = np.pad(universe_data, (0, 512 - universe_data.size), 'constant')
                     
                     # Send the data

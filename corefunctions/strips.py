@@ -302,61 +302,76 @@ class StripManager:
             # Sort strips by Strip_num to ensure correct order
             strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
             
-            # Calculate total pixel count for this IP
-            total_pixels = sum(strip.length for strip in strips)
+            # Group strips by type
+            rgb_strips = [s for s in strips if s.metadata.get('Type', 'RGB') == 'RGB']
+            rgbw_strips = [s for s in strips if s.metadata.get('Type', 'RGBW') == 'RGBW']
+            dmx_strips = [s for s in strips if s.metadata.get('Type', 'DMX') == 'DMX']
             
-            # Create receiver configuration with strip mapping info
-            receiver_config = {
-                'ip': ip,
-                'pixel_count': total_pixels,
-                'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1)) 
-                            for strip in strips],
-                'type': 'RGB'  # Default type will be overridden for each strip
-            }
+            # Prepare receivers list to handle multiple types per IP
+            receivers = []
             
-            # Add type information to strip_info and prepare receiver config
-            rgb_strips = []
-            rgbw_strips = []
+            # Add RGB receiver if needed
+            if rgb_strips:
+                rgb_receiver = {
+                    'ip': ip,
+                    'pixel_count': sum(strip.length for strip in rgb_strips),
+                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGB') 
+                                for strip in rgb_strips],
+                    'type': 'RGB'
+                }
+                receivers.append(rgb_receiver)
             
-            # Prepare strip info with type information
-            strip_info = []
+            # Add RGBW receiver if needed
+            if rgbw_strips:
+                rgbw_receiver = {
+                    'ip': ip,
+                    'pixel_count': sum(strip.length for strip in rgbw_strips),
+                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGBW') 
+                                for strip in rgbw_strips],
+                    'type': 'RGBW'
+                }
+                receivers.append(rgbw_receiver)
+            
+            # Add DMX receiver if needed
+            if dmx_strips:
+                dmx_receiver = {
+                    'ip': ip,
+                    'pixel_count': sum(strip.length for strip in dmx_strips),
+                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'DMX') 
+                                for strip in dmx_strips],
+                    'type': 'DMX'
+                }
+                receivers.append(dmx_receiver)
+            
+            # Create strip info for all strips on this IP
+            all_strip_info = []
             for strip in strips:
                 strip_type = strip.metadata.get('Type', 'RGB')
-                strip_info.append((
+                all_strip_info.append((
                     strip.id, 
                     strip.length, 
                     strip.metadata.get('Direction', 1), 
                     strip_type
                 ))
-                
-                # Group strips by type
-                if strip_type == 'RGB':
-                    rgb_strips.append(strip)
-                elif strip_type == 'RGBW':
-                    rgbw_strips.append(strip)
             
-            # Update receiver config with the new strip_info
-            receiver_config['strip_info'] = strip_info
+            # Print info about this IP's strips
+            strip_types = []
+            if rgb_strips: strip_types.append(f"RGB ({sum(s.length for s in rgb_strips)} pixels)")
+            if rgbw_strips: strip_types.append(f"RGBW ({sum(s.length for s in rgbw_strips)} pixels)")
+            if dmx_strips: strip_types.append(f"DMX ({sum(s.length for s in dmx_strips)} pixels)")
+            print(f"IP {ip} has: {', '.join(strip_types)}")
             
-            # Create sender with combined configuration
             try:
-                # If we have both RGB and RGBW strips, ensure the sender knows about this
-                if rgb_strips and rgbw_strips:
-                    print(f"IP {ip} has both RGB and RGBW strips")
+                # Create a single sender for all receivers on this IP
+                sender = SACNPixelSender(receivers)
                 
-                # Set type based on what types of strips this receiver has
-                if rgb_strips and not rgbw_strips:
-                    receiver_config['type'] = 'RGB'
-                elif rgbw_strips and not rgb_strips:
-                    receiver_config['type'] = 'RGBW'
-                else:
-                    # If mixed, we'll need to handle this in the sender
-                    receiver_config['type'] = 'MIXED'
-                
-                sender = SACNPixelSender([receiver_config])
+                # Store sender with combined strip info
                 senders[ip] = {
                     'sender': sender,
-                    'config': receiver_config
+                    'config': {
+                        'ip': ip,
+                        'strip_info': all_strip_info
+                    }
                 }
             except Exception as e:
                 print(f"Error creating DMX sender for {ip}: {e}")
