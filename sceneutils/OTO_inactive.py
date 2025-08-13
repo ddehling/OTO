@@ -52,10 +52,16 @@ def OTO_inactive_pattern_cycle(instate, outstate):
     
     global_alpha=outstate.get('control_mode_inactive', 1)
     buffers.generator_alphas[name] = global_alpha
-    if global_alpha<0.01:   
-       
+    if global_alpha < 0.01:
+        # Clear all pattern buffers when alpha is very low
+        for pattern_name in instate['pattern_names']:
+            buffers.generator_alphas[pattern_name] = 0
+            # Get and clear all buffers for this pattern
+            pattern_buffers = buffers.get_all_buffers(pattern_name)
+            for _, buffer in pattern_buffers.items():
+                buffer[:] = [0, 0, 0, 0]  # Set all pixels to transparent black
         return
-    
+        
     # Update current pattern position based on time
     time_position = (outstate['current_time'] % instate['cycle_duration']) / instate['cycle_duration']
     instate['current_pattern'] = time_position * instate['num_patterns']
@@ -372,7 +378,6 @@ def OTO_generic_pattern(instate, outstate):
 
 
 # ... existing code ...
-
 def OTO_awaken(instate, outstate):
     """
     Awakening pattern generator with movement between base strips and ear animations.
@@ -380,7 +385,8 @@ def OTO_awaken(instate, outstate):
     Features:
     1. Base groups: Movement flows between bottom, middle, and top strips
     2. Ear strips: Spinning movement when control_sensor is active
-    3. Alpha level controlled by outstate['control_mode_awaken']
+    3. Head strips: Slow random frequency pulsing with silvery color
+    4. Alpha level controlled by outstate['control_mode_awaken']
     
     The pattern creates a flow of energy moving from bottom strips to middle strips
     to top strips, simulating an awakening or activation sequence.
@@ -403,6 +409,8 @@ def OTO_awaken(instate, outstate):
         instate['base_middle_strips'] = []
         instate['base_top_strips'] = []
         instate['ear_strips'] = []
+        instate['head_strips'] = []
+        instate['head_pulse_rates'] = {}  # Store random pulse rates for head strips
         
         # Identify and categorize strips
         for strip_id in strip_manager.strips:
@@ -418,6 +426,11 @@ def OTO_awaken(instate, outstate):
             
             if 'ear' in strip.groups:
                 instate['ear_strips'].append(strip_id)
+                
+            if 'head' in strip.groups:
+                instate['head_strips'].append(strip_id)
+                # Assign random pulse rate for each head strip (between 0.05 and 0.2 Hz)
+                instate['head_pulse_rates'][strip_id] = 0.05 + 0.15 * np.random.random()
         
         return
 
@@ -617,6 +630,36 @@ def OTO_awaken(instate, outstate):
             # Gentle blue pulse
             buffer[:] = [0.0, intensity * 0.5, intensity, intensity]
         
+        elif strip_id in instate['head_strips']:
+            # Head strips - slow random frequency pulsing with silvery color
+            pulse_rate = instate['head_pulse_rates'][strip_id]  # Get this strip's unique pulse rate
+            pulse_phase = (outstate['current_time'] * pulse_rate) % 1.0
+            
+            # Smooth pulsing effect - using sine wave for gentle transitions
+            intensity = 0.3 + 0.4 * np.sin(pulse_phase * 2 * np.pi)
+            
+            # Silvery color (slight blue tint)
+            r_val = intensity * 0.8  # High red for silver
+            g_val = intensity * 0.9  # High green for silver
+            b_val = intensity        # Full blue for slight blue tint
+            a_val = intensity * 0.9  # Slightly transparent
+            
+            # Set uniform silvery color for the strip
+            buffer[:] = [r_val, g_val, b_val, a_val]
+            
+            # Add subtle sparkles for silver effect
+            sparkle_count = int(strip_length * 0.05)  # 5% of pixels get sparkles
+            sparkle_indices = np.random.choice(strip_length, sparkle_count, replace=False)
+            
+            for idx in sparkle_indices:
+                sparkle_intensity = intensity * (0.9 + 0.3 * np.random.random())
+                buffer[idx] = [
+                    sparkle_intensity,      # Full white for sparkles
+                    sparkle_intensity,
+                    sparkle_intensity,
+                    sparkle_intensity * 0.9
+                ]
+        
         else:
             # Other strips - subtle blue pulsing
             pulse_rate = 0.3  # Slower pulse for background strips
@@ -627,5 +670,3 @@ def OTO_awaken(instate, outstate):
             
             # Very subtle blue glow
             buffer[:] = [0.0, intensity * 0.3, intensity, intensity * 0.5]
-
-# ... existing code ...
