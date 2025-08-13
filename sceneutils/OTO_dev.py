@@ -156,7 +156,7 @@ def OTO_heartbeat(instate, outstate):
         instate['phase'] = 0.0      # current phase of the heartbeat cycle
         
         # Parameters for circular patterns
-        instate['wave_freq'] = 6.0  # Number of waves around the circle
+        instate['wave_freq'] = 1.0  # Number of waves around the circle
         instate['rotation_speed'] = 0.8  # Rotation speed (revolutions per second)
         
         # Print debug information
@@ -208,12 +208,12 @@ def OTO_heartbeat(instate, outstate):
         instate['peak_color'] = peak_color
     
     # Check if heart rate should be updated from external conditions
-    if 'control_speed' in outstate:
-        instate['heart_rate'] = outstate['control_speed']
+    
+    instate['heart_rate'] = outstate.get('heart_speed',60)
     
     # Check if strength should be updated from external conditions
-    if 'control_intensity' in outstate:
-        instate['strength'] = outstate['control_intensity']/100.0
+    
+    instate['strength'] = outstate.get('heart_intensity',100)/100.0
     
     # Process each buffer
     for strip_id, buffer in all_buffers.items():
