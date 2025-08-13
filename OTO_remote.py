@@ -121,7 +121,7 @@ class EnvironmentalSystem:
                 if type == "state":
                     self.state[type]=value
                 if type=="emotions":
-                    self.raw_values[type]=value/10.0
+                    self.raw_values[type]=value*10.0
                 if address in self.utility_names:
                     if address=="sound_in":
                         np.roll(self.sound_hist,1)

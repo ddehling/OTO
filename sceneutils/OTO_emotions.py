@@ -1242,14 +1242,14 @@ def apply_flame_effect(buffer, strip_length, strip_id, instate, outstate, delta_
             
             instate['flames'][strip_id].append({
                 'position': pos,
-                'speed': 15 + random.random() * 15,
+                'speed': 25 + random.random() * 15,
                 # INCREASE FLAME SIZE: from 8+7 to 12+10
-                'size': 12 + random.randint(0, 10),  # Larger flames
+                'size':82 + random.randint(0, 30),  # Larger flames
                 'intensity': 0.6 + random.random() * 0.4,
                 'direction': flame_dir,
                 'life': 0.0,
                 # INCREASE DURATION: from 0.8+0.7 to 1.2+1.0
-                'duration': 1.2 + random.random() * 1.0  # Longer-lasting flames
+                'duration': 3.2 + random.random() * 4.0  # Longer-lasting flames
             })
     
     # INCREASE FLAME CREATION PROBABILITY: from 0.1 to 0.2
@@ -1264,18 +1264,29 @@ def apply_flame_effect(buffer, strip_length, strip_id, instate, outstate, delta_
             pos = random.randint(0, strip_length - 1)
             middle = strip_length // 2
             flame_dir = 1 if pos < middle else -1
-        
         instate['flames'][strip_id].append({
             'position': pos,
             'speed': 15 + random.random() * 15,
             # INCREASE FLAME SIZE: from 8+7 to 12+10
-            'size': 22 + random.randint(0, 10),  # Larger flames
+            'size':42 + random.randint(0, 30),  # Larger flames
             'intensity': 0.6 + random.random() * 0.4,
             'direction': flame_dir,
             'life': 0.0,
             # INCREASE DURATION: from 0.8+0.7 to 1.2+1.0
-            'duration': 1.2 + random.random() * 1.0  # Longer-lasting flames
+            'duration': 1.2 + random.random() * 4.0  # Longer-lasting flames
         })
+    
+        # instate['flames'][strip_id].append({
+        #     'position': pos,
+        #     'speed': 15 + random.random() * 15,
+        #     # INCREASE FLAME SIZE: from 8+7 to 12+10
+        #     'size': 22 + random.randint(0, 10),  # Larger flames
+        #     'intensity': 0.6 + random.random() * 0.4,
+        #     'direction': flame_dir,
+        #     'life': 0.0,
+        #     # INCREASE DURATION: from 0.8+0.7 to 1.2+1.0
+        #     'duration': 1.2 + random.random() * 1.0  # Longer-lasting flames
+        # })
     
     # Update existing flames
     new_flames = []
