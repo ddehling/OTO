@@ -12,9 +12,12 @@ def OTO_inactive_pattern_cycle(instate, outstate):
     Each pattern has its own buffer and alpha value determined by its proximity
     to the current active pattern position. Patterns more than 1 unit away from
     the current position have zero alpha and are skipped for efficiency.
+    
+    Spots strips receive special treatment with slower, gentler animations.
     """
     name = 'pattern_cycle'
     buffers = outstate['buffers']
+    strip_manager = buffers.strip_manager
 
     if instate['count'] == 0:
         # Register our main generator on first run
@@ -38,6 +41,7 @@ def OTO_inactive_pattern_cycle(instate, outstate):
         instate['cycle_phases'] = {}   # For pattern 2 (brightness cycling)
         instate['rainbow_offset'] = 0.0  # For pattern 3 (rainbow waves)
         instate['pulse_positions'] = {}  # For pattern 4 (pulse)
+        instate['spots_state'] = {}    # Special state for spots strips
         
         return
 
@@ -101,134 +105,253 @@ def OTO_inactive_pattern_cycle(instate, outstate):
             # Pattern 0: Slow Twinkle
             # Stars appear randomly, gradually brighten, then fade out
             
-            # First, fade existing stars
             for strip_id, buffer in pattern_buffers.items():
-                if strip_id not in instate['twinkle_stars']:
-                    instate['twinkle_stars'][strip_id] = []
+                # Check if this is a spots strip
+                strip = strip_manager.get_strip(strip_id)
+                is_spots = 'spots' in strip.groups if strip else False
                 
-                # Update existing stars
-                new_stars = []
-                for star in instate['twinkle_stars'][strip_id]:
-                    # Update star life
-                    star['life'] += delta_time / star['duration']
+                if is_spots:
+                    # Initialize spots state if needed
+                    if strip_id not in instate['spots_state']:
+                        instate['spots_state'][strip_id] = {
+                            'pattern_0': {
+                                'glow_phase': np.random.random() * 2 * np.pi,
+                                'glow_speed': 0.15,  # Very slow glow
+                                'base_brightness': 0.3,
+                                'color': [0.9, 0.9, 0.8]  # Warm white
+                            }
+                        }
                     
-                    # Calculate brightness based on life cycle
-                    if star['life'] < 0.5:
-                        # Fade in
-                        brightness = star['life'] * 2
-                    else:
-                        # Fade out
-                        brightness = 2.0 - (star['life'] * 2)
+                    spots = instate['spots_state'][strip_id]['pattern_0']
                     
-                    brightness = max(0.0, min(1.0, brightness))
+                    # Update glow phase
+                    spots['glow_phase'] += spots['glow_speed'] * delta_time
                     
-                    # Set pixel color with calculated brightness
-                    if star['life'] < 1.0:
-                        buffer[star['position']] = [
-                            star['color'][0] * brightness,
-                            star['color'][1] * brightness, 
-                            star['color'][2] * brightness,
-                            brightness
-                        ]
-                        new_stars.append(star)
-                
-                # Replace star list with active stars
-                instate['twinkle_stars'][strip_id] = new_stars
-                
-                # Randomly add new stars (more rarely for a slow twinkle)
-                if np.random.random() < 0.05:  # 5% chance per frame per strip
-                    position = np.random.randint(0, len(buffer))
-                    color = [
-                        0.7 + 0.3 * np.random.random(),  # Slightly randomized white
-                        0.7 + 0.3 * np.random.random(),
-                        0.7 + 0.3 * np.random.random()
+                    # Calculate gentle glow
+                    glow = spots['base_brightness'] + 0.2 * (0.5 + 0.5 * np.sin(spots['glow_phase']))
+                    
+                    # Apply uniform gentle glow to entire strip
+                    buffer[:] = [
+                        spots['color'][0] * glow,
+                        spots['color'][1] * glow,
+                        spots['color'][2] * glow,
+                        glow * 0.8
                     ]
-                    instate['twinkle_stars'][strip_id].append({
-                        'position': position,
-                        'color': color,
-                        'duration': 3.0 + np.random.random() * 5.0,  # 3-8 second duration
-                        'life': 0.0  # 0.0 to 1.0 life cycle
-                    })
+                else:
+                    # Regular twinkle effect for non-spots strips
+                    if strip_id not in instate['twinkle_stars']:
+                        instate['twinkle_stars'][strip_id] = []
+                    
+                    # Update existing stars
+                    new_stars = []
+                    for star in instate['twinkle_stars'][strip_id]:
+                        # Update star life
+                        star['life'] += delta_time / star['duration']
+                        
+                        # Calculate brightness based on life cycle
+                        if star['life'] < 0.5:
+                            # Fade in
+                            brightness = star['life'] * 2
+                        else:
+                            # Fade out
+                            brightness = 2.0 - (star['life'] * 2)
+                        
+                        brightness = max(0.0, min(1.0, brightness))
+                        
+                        # Set pixel color with calculated brightness
+                        if star['life'] < 1.0:
+                            buffer[star['position']] = [
+                                star['color'][0] * brightness,
+                                star['color'][1] * brightness, 
+                                star['color'][2] * brightness,
+                                brightness
+                            ]
+                            new_stars.append(star)
+                    
+                    # Replace star list with active stars
+                    instate['twinkle_stars'][strip_id] = new_stars
+                    
+                    # Randomly add new stars (more rarely for a slow twinkle)
+                    if np.random.random() < 0.05:  # 5% chance per frame per strip
+                        position = np.random.randint(0, len(buffer))
+                        color = [
+                            0.7 + 0.3 * np.random.random(),  # Slightly randomized white
+                            0.7 + 0.3 * np.random.random(),
+                            0.7 + 0.3 * np.random.random()
+                        ]
+                        instate['twinkle_stars'][strip_id].append({
+                            'position': position,
+                            'color': color,
+                            'duration': 3.0 + np.random.random() * 5.0,  # 3-8 second duration
+                            'life': 0.0  # 0.0 to 1.0 life cycle
+                        })
         
         elif i == 1:
             # Pattern 1: Moving Dots with Fade Trails
             # Dots that move along strips and leave fading trails
             
-            # Initialize movers if needed
             for strip_id, buffer in pattern_buffers.items():
-                if strip_id not in instate['movers']:
-                    instate['movers'][strip_id] = []
-                    # Create 2 initial movers per strip
-                    for _ in range(2):
-                        instate['movers'][strip_id].append({
-                            'position': np.random.random() * len(buffer),
-                            'speed': 5.0 + np.random.random() * 10.0,  # 5-15 pixels/sec
-                            'color': [
+                # Check if this is a spots strip
+                strip = strip_manager.get_strip(strip_id)
+                is_spots = 'spots' in strip.groups if strip else False
+                
+                if is_spots:
+                    # Initialize spots state if needed
+                    if strip_id not in instate['spots_state']:
+                        instate['spots_state'][strip_id] = {}
+                    if 'pattern_1' not in instate['spots_state'][strip_id]:
+                        instate['spots_state'][strip_id]['pattern_1'] = {
+                            'position': 0.0,
+                            'direction': 1,
+                            'speed': 2.0,  # Much slower movement
+                            'color_phase': 0.0,
+                            'color_speed': 0.1  # Slow color change
+                        }
+                    
+                    spots = instate['spots_state'][strip_id]['pattern_1']
+                    
+                    # Update position very slowly
+                    spots['position'] += spots['speed'] * spots['direction'] * delta_time
+                    
+                    # Reverse at ends
+                    if spots['position'] >= len(buffer):
+                        spots['position'] = len(buffer) - 1
+                        spots['direction'] = -1
+                    elif spots['position'] < 0:
+                        spots['position'] = 0
+                        spots['direction'] = 1
+                    
+                    # Update color phase
+                    spots['color_phase'] += spots['color_speed'] * delta_time
+                    
+                    # Calculate color
+                    hue = spots['color_phase'] % 1.0
+                    r, g, b = hsv_to_rgb(hue, 0.5, 0.6)  # Muted colors
+                    
+                    # Create smooth gradient across strip
+                    for j in range(len(buffer)):
+                        # Calculate distance from current position
+                        dist = abs(j - spots['position']) / len(buffer)
+                        
+                        # Smooth falloff
+                        intensity = max(0, 1.0 - dist * 2) ** 2
+                        
+                        buffer[j] = [r * intensity, g * intensity, b * intensity, intensity * 0.7]
+                else:
+                    # Regular moving dots for non-spots strips
+                    # Initialize movers if needed
+                    if strip_id not in instate['movers']:
+                        instate['movers'][strip_id] = []
+                        # Create 2 initial movers per strip
+                        for _ in range(2):
+                            instate['movers'][strip_id].append({
+                                'position': np.random.random() * len(buffer),
+                                'speed': 5.0 + np.random.random() * 10.0,  # 5-15 pixels/sec
+                                'color': [
+                                    0.5 + 0.5 * np.random.random(),
+                                    0.5 + 0.5 * np.random.random(),
+                                    0.5 + 0.5 * np.random.random()
+                                ]
+                            })
+                    
+                    # Fade all pixels slightly
+                    fade_factor = 0.95  # 5% fade per frame
+                    buffer[:, 3] *= fade_factor
+                    
+                    # Update movers
+                    for mover in instate['movers'][strip_id]:
+                        # Update position
+                        mover['position'] += mover['speed'] * delta_time
+                        
+                        # Wrap around at strip end
+                        if mover['position'] >= len(buffer):
+                            mover['position'] = 0
+                            # New random color when wrapping
+                            mover['color'] = [
                                 0.5 + 0.5 * np.random.random(),
                                 0.5 + 0.5 * np.random.random(),
                                 0.5 + 0.5 * np.random.random()
                             ]
-                        })
-                
-                # Fade all pixels slightly
-                fade_factor = 0.95  # 5% fade per frame
-                buffer[:, 3] *= fade_factor
-                
-                # Update movers
-                for mover in instate['movers'][strip_id]:
-                    # Update position
-                    mover['position'] += mover['speed'] * delta_time
-                    
-                    # Wrap around at strip end
-                    if mover['position'] >= len(buffer):
-                        mover['position'] = 0
-                        # New random color when wrapping
-                        mover['color'] = [
-                            0.5 + 0.5 * np.random.random(),
-                            0.5 + 0.5 * np.random.random(),
-                            0.5 + 0.5 * np.random.random()
-                        ]
-                    
-                    # Set pixel and create small trail
-                    pos = int(mover['position'])
-                    buffer[pos] = [mover['color'][0], mover['color'][1], mover['color'][2], 1.0]
-                    
-                    # Add a short trail
-                    for i in range(1, 5):
-                        trail_pos = (pos - i) % len(buffer)
-                        trail_alpha = 1.0 - (i / 5.0)  # Fade based on distance
-                        buffer[trail_pos] = [
-                            mover['color'][0] * trail_alpha,
-                            mover['color'][1] * trail_alpha,
-                            mover['color'][2] * trail_alpha,
-                            trail_alpha
-                        ]
+                        
+                        # Set pixel and create small trail
+                        pos = int(mover['position'])
+                        buffer[pos] = [mover['color'][0], mover['color'][1], mover['color'][2], 1.0]
+                        
+                        # Add a short trail
+                        for k in range(1, 5):
+                            trail_pos = (pos - k) % len(buffer)
+                            trail_alpha = 1.0 - (k / 5.0)  # Fade based on distance
+                            buffer[trail_pos] = [
+                                mover['color'][0] * trail_alpha,
+                                mover['color'][1] * trail_alpha,
+                                mover['color'][2] * trail_alpha,
+                                trail_alpha
+                            ]
         
         elif i == 2:
             # Pattern 2: Global Slow Brightness Cycling
             # Each strip cycles brightness at slightly different rates
             
-            # Initialize cycle phases if needed
             for strip_id, buffer in pattern_buffers.items():
-                if strip_id not in instate['cycle_phases']:
-                    # Random starting phase and period for each strip
-                    instate['cycle_phases'][strip_id] = {
-                        'phase': np.random.random(),
-                        'period': 8.0 + np.random.random() * 4.0  # 8-12 second cycle
-                    }
+                # Check if this is a spots strip
+                strip = strip_manager.get_strip(strip_id)
+                is_spots = 'spots' in strip.groups if strip else False
                 
-                # Update phase
-                instate['cycle_phases'][strip_id]['phase'] += delta_time / instate['cycle_phases'][strip_id]['period']
-                if instate['cycle_phases'][strip_id]['phase'] > 1.0:
-                    instate['cycle_phases'][strip_id]['phase'] -= 1.0
-                
-                # Calculate brightness using sinusoidal pattern
-                phase = instate['cycle_phases'][strip_id]['phase']
-                brightness = 0.2 + 0.8 * (0.5 + 0.5 * np.sin(phase * 2 * np.pi))
-                
-                # Apply a uniform dim color to the entire strip
-                # Using a warm white/amber
-                buffer[:] = [brightness, brightness * 0.8, brightness * 0.5, brightness]
+                if is_spots:
+                    # Initialize spots state if needed
+                    if strip_id not in instate['spots_state']:
+                        instate['spots_state'][strip_id] = {}
+                    if 'pattern_2' not in instate['spots_state'][strip_id]:
+                        instate['spots_state'][strip_id]['pattern_2'] = {
+                            'phase': np.random.random(),
+                            'period': 15.0,  # Much longer period for spots
+                            'color_shift': 0.0
+                        }
+                    
+                    spots = instate['spots_state'][strip_id]['pattern_2']
+                    
+                    # Update phase very slowly
+                    spots['phase'] += delta_time / spots['period']
+                    if spots['phase'] > 1.0:
+                        spots['phase'] -= 1.0
+                    
+                    # Update color shift
+                    spots['color_shift'] += delta_time * 0.02  # Very slow color drift
+                    
+                    # Calculate brightness using smoother curve
+                    phase = spots['phase']
+                    brightness = 0.3 + 0.4 * (0.5 + 0.5 * np.cos(phase * 2 * np.pi))
+                    
+                    # Apply a warm color with slow shift
+                    hue_shift = spots['color_shift'] % 0.1  # Stay in warm range
+                    buffer[:] = [
+                        brightness * (1.0 - hue_shift), 
+                        brightness * (0.8 - hue_shift * 0.5), 
+                        brightness * (0.5 + hue_shift), 
+                        brightness * 0.8
+                    ]
+                else:
+                    # Regular brightness cycling for non-spots strips
+                    # Initialize cycle phases if needed
+                    if strip_id not in instate['cycle_phases']:
+                        # Random starting phase and period for each strip
+                        instate['cycle_phases'][strip_id] = {
+                            'phase': np.random.random(),
+                            'period': 8.0 + np.random.random() * 4.0  # 8-12 second cycle
+                        }
+                    
+                    # Update phase
+                    instate['cycle_phases'][strip_id]['phase'] += delta_time / instate['cycle_phases'][strip_id]['period']
+                    if instate['cycle_phases'][strip_id]['phase'] > 1.0:
+                        instate['cycle_phases'][strip_id]['phase'] -= 1.0
+                    
+                    # Calculate brightness using sinusoidal pattern
+                    phase = instate['cycle_phases'][strip_id]['phase']
+                    brightness = 0.2 + 0.8 * (0.5 + 0.5 * np.sin(phase * 2 * np.pi))
+                    
+                    # Apply a uniform dim color to the entire strip
+                    # Using a warm white/amber
+                    buffer[:] = [brightness, brightness * 0.8, brightness * 0.5, brightness]
         
         elif i == 3:
             # Pattern 3: Rainbow Waves
@@ -240,76 +363,141 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 instate['rainbow_offset'] -= 1.0
             
             for strip_id, buffer in pattern_buffers.items():
-                # Apply rainbow pattern across the strip
+                # Check if this is a spots strip
+                strip = strip_manager.get_strip(strip_id)
+                is_spots = 'spots' in strip.groups if strip else False
+                
                 strip_length = len(buffer)
                 
-                for j in range(strip_length):
-                    # Calculate hue based on position and offset
-                    # This creates a flowing rainbow effect
-                    hue = (j / strip_length + instate['rainbow_offset']) % 1.0
+                if is_spots:
+                    # Initialize spots state if needed
+                    if strip_id not in instate['spots_state']:
+                        instate['spots_state'][strip_id] = {}
+                    if 'pattern_3' not in instate['spots_state'][strip_id]:
+                        instate['spots_state'][strip_id]['pattern_3'] = {
+                            'hue': np.random.random(),
+                            'hue_speed': 0.03,  # Very slow hue rotation
+                            'saturation': 0.4  # Lower saturation for gentler colors
+                        }
                     
-                    # Convert HSV to RGB (saturation and value fixed for vibrant colors)
-                    r, g, b = hsv_to_rgb(hue, 0.8, 0.7)
+                    spots = instate['spots_state'][strip_id]['pattern_3']
                     
-                    # Set pixel color
-                    buffer[j] = [r, g, b, 0.7]  # Slightly transparent
+                    # Update hue slowly
+                    spots['hue'] += spots['hue_speed'] * delta_time
+                    spots['hue'] %= 1.0
+                    
+                    # Apply single color with subtle variation across strip
+                    for j in range(strip_length):
+                        # Add slight hue variation across strip
+                        local_hue = (spots['hue'] + j / (strip_length * 10)) % 1.0
+                        
+                        # Convert HSV to RGB with reduced saturation
+                        r, g, b = hsv_to_rgb(local_hue, spots['saturation'], 0.5)
+                        
+                        # Set pixel color
+                        buffer[j] = [r, g, b, 0.6]
+                else:
+                    # Regular rainbow wave for non-spots strips
+                    # Apply rainbow pattern across the strip
+                    for j in range(strip_length):
+                        # Calculate hue based on position and offset
+                        # This creates a flowing rainbow effect
+                        hue = (j / strip_length + instate['rainbow_offset']) % 1.0
+                        
+                        # Convert HSV to RGB (saturation and value fixed for vibrant colors)
+                        r, g, b = hsv_to_rgb(hue, 0.8, 0.7)
+                        
+                        # Set pixel color
+                        buffer[j] = [r, g, b, 0.7]  # Slightly transparent
         
         elif i == 4:
             # Pattern 4: Pulses
             # Waves of light that travel along strips
             
-            # Initialize pulse positions if needed
             for strip_id, buffer in pattern_buffers.items():
-                if strip_id not in instate['pulse_positions']:
-                    instate['pulse_positions'][strip_id] = []
-                    # Create an initial pulse
-                    instate['pulse_positions'][strip_id].append({
-                        'position': 0,
-                        'speed': 30.0,  # Pixels per second
-                        'width': 10,    # Width of pulse in pixels
-                        'hue': np.random.random()  # Random color
-                    })
+                # Check if this is a spots strip
+                strip = strip_manager.get_strip(strip_id)
+                is_spots = 'spots' in strip.groups if strip else False
                 
-                # Clear buffer
-                buffer[:] = [0, 0, 0, 0]
-                
-                # Update existing pulses
-                new_pulses = []
-                for pulse in instate['pulse_positions'][strip_id]:
-                    # Update position
-                    pulse['position'] += pulse['speed'] * delta_time
+                if is_spots:
+                    # Initialize spots state if needed
+                    if strip_id not in instate['spots_state']:
+                        instate['spots_state'][strip_id] = {}
+                    if 'pattern_4' not in instate['spots_state'][strip_id]:
+                        instate['spots_state'][strip_id]['pattern_4'] = {
+                            'pulse_phase': 0.0,
+                            'pulse_speed': 0.2,  # Slow pulse
+                            'color': [0.6, 0.7, 0.9],  # Soft blue-white
+                            'last_pulse_time': 0.0
+                        }
                     
-                    # If pulse has left the strip, don't keep it
-                    if pulse['position'] - pulse['width'] > len(buffer):
-                        continue
+                    spots = instate['spots_state'][strip_id]['pattern_4']
                     
-                    # Draw the pulse
-                    for j in range(pulse['width'] * 2):
-                        pos = int(pulse['position']) - j
-                        if 0 <= pos < len(buffer):
-                            # Calculate intensity based on distance from pulse center
-                            intensity = 1.0 - (j / (pulse['width'] * 2))
-                            
-                            # Convert pulse color from HSV to RGB
-                            r, g, b = hsv_to_rgb(pulse['hue'], 1.0, 1.0)
-                            
-                            # Set pixel
-                            buffer[pos] = [r * intensity, g * intensity, b * intensity, intensity]
+                    # Update pulse phase
+                    spots['pulse_phase'] += spots['pulse_speed'] * delta_time
                     
-                    new_pulses.append(pulse)
-                
-                # Replace with active pulses
-                instate['pulse_positions'][strip_id] = new_pulses
-                
-                # Randomly add new pulses
-                if np.random.random() < 0.02:  # 2% chance per frame per strip
-                    instate['pulse_positions'][strip_id].append({
-                        'position': 0,
-                        'speed': 30.0 + np.random.random() * 20.0,  # 30-50 pixels/sec
-                        'width': 5 + int(np.random.random() * 10),  # 5-15 pixels wide
-                        'hue': np.random.random()  # Random color
-                    })
-
+                    # Calculate pulse intensity (single slow pulse across entire strip)
+                    intensity = 0.2 + 0.5 * (0.5 + 0.5 * np.sin(spots['pulse_phase'] * 2 * np.pi))
+                    
+                    # Apply uniform pulse to entire strip
+                    buffer[:] = [
+                        spots['color'][0] * intensity,
+                        spots['color'][1] * intensity,
+                        spots['color'][2] * intensity,
+                        intensity * 0.7
+                    ]
+                else:
+                    # Regular pulse effect for non-spots strips
+                    # Initialize pulse positions if needed
+                    if strip_id not in instate['pulse_positions']:
+                        instate['pulse_positions'][strip_id] = []
+                        # Create an initial pulse
+                        instate['pulse_positions'][strip_id].append({
+                            'position': 0,
+                            'speed': 30.0,  # Pixels per second
+                            'width': 10,    # Width of pulse in pixels
+                            'hue': np.random.random()  # Random color
+                        })
+                    
+                    # Clear buffer
+                    buffer[:] = [0, 0, 0, 0]
+                    
+                    # Update existing pulses
+                    new_pulses = []
+                    for pulse in instate['pulse_positions'][strip_id]:
+                        # Update position
+                        pulse['position'] += pulse['speed'] * delta_time
+                        
+                        # If pulse has left the strip, don't keep it
+                        if pulse['position'] - pulse['width'] > len(buffer):
+                            continue
+                        
+                        # Draw the pulse
+                        for j in range(pulse['width'] * 2):
+                            pos = int(pulse['position']) - j
+                            if 0 <= pos < len(buffer):
+                                # Calculate intensity based on distance from pulse center
+                                intensity = 1.0 - (j / (pulse['width'] * 2))
+                                
+                                # Convert pulse color from HSV to RGB
+                                r, g, b = hsv_to_rgb(pulse['hue'], 1.0, 1.0)
+                                
+                                # Set pixel
+                                buffer[pos] = [r * intensity, g * intensity, b * intensity, intensity]
+                        
+                        new_pulses.append(pulse)
+                    
+                    # Replace with active pulses
+                    instate['pulse_positions'][strip_id] = new_pulses
+                    
+                    # Randomly add new pulses
+                    if np.random.random() < 0.02:  # 2% chance per frame per strip
+                        instate['pulse_positions'][strip_id].append({
+                            'position': 0,
+                            'speed': 30.0 + np.random.random() * 20.0,  # 30-50 pixels/sec
+                            'width': 5 + int(np.random.random() * 10),  # 5-15 pixels wide
+                            'hue': np.random.random()  # Random color
+                        })
 
 
 # ... existing code ...

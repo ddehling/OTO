@@ -528,6 +528,7 @@ def OTO_sad_theme(instate, outstate):
         instate['heart_phase_right'] = 0.5  # For right heartbeat timing (start offset)
         instate['dandelion_seeds'] = {}  # For tracking floating seeds
         instate['last_drop_time'] = {}  # Time tracker for raindrop creation (per strip)
+        instate['spots_state'] = {}  # Track slow transitions for spots strips
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -588,7 +589,63 @@ def OTO_sad_theme(instate, outstate):
         base_hue, base_sat, base_val = instate['colors']['grey_blue']
         base_r, base_g, base_b = hsv_to_rgb(base_hue, base_sat * 0.5, base_val * 0.3)
         buffer[:] = [base_r, base_g, base_b, 0.2]  # Very dim base
-    
+
+        # Special handling for spots strips - slow, gentle transitions
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'current_color': 'grey_blue',
+                    'target_color': 'deep_blue',
+                    'transition_progress': 0.0,
+                    'hold_time': 0.0,
+                    'pulse_phase': np.random.random() * 2 * np.pi
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update transition
+            if spots['transition_progress'] < 1.0:
+                # Slow transition - 3 seconds to change color
+                spots['transition_progress'] += delta_time / 3.0
+                spots['transition_progress'] = min(1.0, spots['transition_progress'])
+            else:
+                # Hold current color for a bit
+                spots['hold_time'] += delta_time
+                if spots['hold_time'] > 2.0:  # Hold for 2 seconds
+                    # Choose new target color
+                    spots['hold_time'] = 0.0
+                    spots['transition_progress'] = 0.0
+                    spots['current_color'] = spots['target_color']
+                    # Pick a new target from sad palette
+                    color_options = ['deep_blue', 'grey_blue', 'dark_grey']
+                    spots['target_color'] = np.random.choice([c for c in color_options if c != spots['current_color']])
+            
+            # Interpolate between colors
+            curr_h, curr_s, curr_v = instate['colors'][spots['current_color']]
+            targ_h, targ_s, targ_v = instate['colors'][spots['target_color']]
+            
+            # Smooth interpolation
+            t = spots['transition_progress']
+            # Use smoothstep for even smoother transitions
+            t = t * t * (3.0 - 2.0 * t)
+            
+            h = curr_h + (targ_h - curr_h) * t
+            s = curr_s + (targ_s - curr_s) * t
+            v = curr_v + (targ_v - curr_v) * t
+            
+            # Add very subtle pulse
+            spots['pulse_phase'] += delta_time * 0.5  # Very slow pulse
+            pulse = 0.9 + 0.1 * np.sin(spots['pulse_phase'])
+            v *= pulse
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v)
+            
+            # Apply to entire strip uniformly
+            buffer[:] = [r, g, b, 0.6]
+            
+            continue  # Skip other effects for spots strips    
 
         # Different effects based on strip type
         if 'spine' in strip.groups or 'base' in strip.groups:
@@ -994,7 +1051,8 @@ def OTO_angry_theme(instate, outstate):
     1. Global alpha controlled by outstate['control_angry'] value
     2. Red, orange, and brown color palette to evoke fire and rage
     3. Simplified flame effects and explosions
-    4. Optimized with vectorized operations where beneficial
+    4. Spots strips use same colors but with slow transitions
+    5. Optimized with vectorized operations where beneficial
     """
     import numpy as np
     from colorsys import hsv_to_rgb  # Use standard Python library for simplicity
@@ -1011,6 +1069,7 @@ def OTO_angry_theme(instate, outstate):
         instate['explosions'] = {}  # Track explosion effects
         instate['flames'] = {}      # Track flame particles
         instate['heart_phase'] = 0.0  # For heartbeat timing
+        instate['spots_state'] = {}  # Track slow transitions for spots strips
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -1065,6 +1124,55 @@ def OTO_angry_theme(instate, outstate):
         h, s, v = instate['colors']['deep_red']
         base_r, base_g, base_b = hsv_to_rgb(h, s * 0.3, v * 0.2)
         buffer[:] = [base_r, base_g, base_b, 0.2]  # Dim base
+
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'current_color': 'deep_red',
+                    'target_color': 'orange',
+                    'transition_progress': 0.0,
+                    'glow_phase': np.random.random() * 2 * np.pi,
+                    'intensity': 0.7
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update transition - slower for spots
+            if spots['transition_progress'] < 1.0:
+                spots['transition_progress'] += delta_time / 2.5  # 2.5 seconds transition
+                spots['transition_progress'] = min(1.0, spots['transition_progress'])
+            else:
+                # Start new transition
+                spots['transition_progress'] = 0.0
+                spots['current_color'] = spots['target_color']
+                # Cycle through angry colors
+                color_cycle = ['deep_red', 'bright_red', 'orange', 'yellow']
+                current_idx = color_cycle.index(spots['current_color'])
+                spots['target_color'] = color_cycle[(current_idx + 1) % len(color_cycle)]
+            
+            # Interpolate between colors
+            curr_h, curr_s, curr_v = instate['colors'][spots['current_color']]
+            targ_h, targ_s, targ_v = instate['colors'][spots['target_color']]
+            
+            t = spots['transition_progress']
+            # Smooth interpolation
+            t = t * t * (3.0 - 2.0 * t)
+            
+            h = curr_h + (targ_h - curr_h) * t
+            s = curr_s + (targ_s - curr_s) * t
+            v = curr_v + (targ_v - curr_v) * t
+            
+            # Add slow "breathing" glow effect
+            spots['glow_phase'] += delta_time * 1.5  # Slow glow
+            glow = 0.7 + 0.3 * np.sin(spots['glow_phase'])
+            v *= glow
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v)
+            
+            # Apply to entire strip
+            buffer[:] = [r, g, b, 0.7]
 
         # Apply strip-specific effects based on group
         if 'heart' in strip.groups:
@@ -1415,6 +1523,7 @@ def OTO_curious_playful(instate, outstate):
         # Initialize parameters
         instate['color_regions'] = {}    # Track color regions per strip
         instate['color_shift'] = 0.0     # Global color shift for variation
+        instate['spots_state'] = {}   
         
         # Color palette (HSV values) - more saturated colors
         instate['colors'] = {
@@ -1476,7 +1585,77 @@ def OTO_curious_playful(instate, outstate):
             
         strip = strip_manager.get_strip(strip_id)
         strip_length = len(buffer)
-        
+
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                # Pick initial colors from the playful palette
+                color_list = list(instate['colors'].keys())
+                instate['spots_state'][strip_id] = {
+                    'colors': [np.random.choice(color_list) for _ in range(3)],  # Track 3 colors
+                    'positions': [i * strip_length / 3 for i in range(3)],  # Evenly spaced
+                    'velocities': [np.random.uniform(2, 5) for _ in range(3)],  # Slow movement
+                    'last_color_change': [0.0, 0.0, 0.0],
+                    'wave_phase': 0.0
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update wave phase for gentle animation
+            spots['wave_phase'] += delta_time * 0.3  # Very slow wave
+            
+            # Update color positions (much slower than regular regions)
+            for i in range(3):
+                spots['positions'][i] += spots['velocities'][i] * delta_time
+                spots['positions'][i] %= strip_length
+                
+                # Occasionally change colors (much less frequently)
+                spots['last_color_change'][i] += delta_time
+                if spots['last_color_change'][i] > 8.0:  # Change every 8 seconds
+                    spots['last_color_change'][i] = 0.0
+                    color_list = list(instate['colors'].keys())
+                    spots['colors'][i] = np.random.choice(color_list)
+                    spots['velocities'][i] = np.random.uniform(2, 5)  # New slow velocity
+            
+            # Render the colors with smooth blending
+            for pixel in range(strip_length):
+                # Calculate influence from each color
+                total_influence = 0.0
+                r, g, b = 0.0, 0.0, 0.0
+                
+                for i in range(3):
+                    # Calculate distance with wrapping
+                    dist = abs(pixel - spots['positions'][i])
+                    dist = min(dist, strip_length - dist)
+                    
+                    # Smooth falloff over larger distance
+                    influence = max(0, 1.0 - (dist / (strip_length * 0.4)))
+                    influence = influence ** 2  # Smoother falloff
+                    
+                    if influence > 0:
+                        h, s, v = instate['colors'][spots['colors'][i]]
+                        # Add subtle wave effect
+                        v *= 0.8 + 0.2 * np.sin(spots['wave_phase'] + pixel * 0.1)
+                        color_r, color_g, color_b = hsv_to_rgb(h, s, v)
+                        
+                        r += color_r * influence
+                        g += color_g * influence
+                        b += color_b * influence
+                        total_influence += influence
+                
+                # Normalize and set pixel
+                if total_influence > 0:
+                    r /= total_influence
+                    g /= total_influence
+                    b /= total_influence
+                    buffer[pixel] = [r, g, b, min(0.8, total_influence)]
+                else:
+                    buffer[pixel] = [0.1, 0.1, 0.1, 0.2]  # Dim default
+            
+            continue  # Skip regular processing for spots strips
+            
+    
+            
         # Initialize color regions for this strip if not already done
         if strip_id not in instate['color_regions']:
             instate['color_regions'][strip_id] = []
@@ -1738,6 +1917,7 @@ def OTO_passionate_floral(instate, outstate):
         instate['bloom_points'] = {}      # Track floral bloom points per strip
         instate['moving_stripes'] = {}    # Track moving stripe patterns
         instate['growth_timer'] = 0.0     # Global timer for coordinated growth
+        instate['spots_state'] = {}    
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -1804,6 +1984,80 @@ def OTO_passionate_floral(instate, outstate):
         
         # Start with a dark base
         buffer[:] = [0.0, 0.0, 0.05, 0.2]  # Very dim blue base
+
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'bloom_phase': np.random.random() * 2 * np.pi,
+                    'primary_color': np.random.choice(['vivid_pink', 'soft_pink', 'deep_blue']),
+                    'secondary_color': np.random.choice(['leaf_green', 'light_green']),
+                    'bloom_intensity': 0.5,
+                    'bloom_speed': 0.15 + np.random.random() * 0.1,  # Very slow blooming
+                    'color_shift_timer': 0.0,
+                    'petal_positions': [np.random.random() * strip_length for _ in range(3)]
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update bloom phase
+            spots['bloom_phase'] += spots['bloom_speed'] * delta_time
+            
+            # Calculate bloom intensity (breathing effect)
+            bloom = 0.4 + 0.6 * (0.5 + 0.5 * np.sin(spots['bloom_phase']))
+            
+            # Occasionally shift colors
+            spots['color_shift_timer'] += delta_time
+            if spots['color_shift_timer'] > 10.0:  # Change every 10 seconds
+                spots['color_shift_timer'] = 0.0
+                # Rotate through floral colors
+                if 'pink' in spots['primary_color']:
+                    spots['primary_color'] = np.random.choice(['deep_blue', 'midnight_blue'])
+                else:
+                    spots['primary_color'] = np.random.choice(['vivid_pink', 'soft_pink'])
+            
+            # Get colors
+            primary_h, primary_s, primary_v = instate['colors'][spots['primary_color']]
+            secondary_h, secondary_s, secondary_v = instate['colors'][spots['secondary_color']]
+            
+            # Create gradient across strip
+            for pixel in range(strip_length):
+                # Calculate position-based variation
+                pos_factor = (pixel / strip_length)
+                
+                # Create petal-like pattern
+                petal_effect = 0.0
+                for petal_pos in spots['petal_positions']:
+                    dist = abs(pixel - petal_pos)
+                    dist = min(dist, strip_length - dist)
+                    petal_influence = max(0, 1.0 - (dist / (strip_length * 0.2)))
+                    petal_effect += petal_influence * 0.5
+                
+                # Blend colors based on position and petal effect
+                if petal_effect > 0.5:
+                    # Use primary color for petals
+                    h, s, v = primary_h, primary_s, primary_v
+                else:
+                    # Blend toward secondary for stems/leaves
+                    blend = petal_effect
+                    h = secondary_h + (primary_h - secondary_h) * blend
+                    s = secondary_s + (primary_s - secondary_s) * blend
+                    v = secondary_v + (primary_v - secondary_v) * blend
+                
+                # Apply bloom intensity
+                v *= bloom * (0.7 + 0.3 * petal_effect)
+                
+                # Convert to RGB
+                r, g, b = hsv_to_rgb(h, s, v)
+                
+                buffer[pixel] = [r, g, b, 0.6 + 0.2 * bloom]
+            
+            # Slowly move petal positions
+            for i in range(len(spots['petal_positions'])):
+                spots['petal_positions'][i] += 0.5 * delta_time  # Very slow drift
+                spots['petal_positions'][i] %= strip_length
+            
+            continue  # Skip regular processing for spots strips
         
         # Initialize bloom points for this strip if not already done
         if strip_id not in instate['bloom_points']:
@@ -2196,6 +2450,7 @@ def OTO_rage_lightning(instate, outstate):
         instate['active_strips'] = []      # Currently active strips
         instate['flash_state'] = False     # Current flash state (on/off)
         instate['last_flash_time'] = 0.0   # Time of last flash change
+        instate['spots_state'] = {}  
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -2291,9 +2546,92 @@ def OTO_rage_lightning(instate, outstate):
         
         # Determine if this is an active strip
         is_active = strip_id in instate['active_strips']
-        
+        strip = strip_manager.get_strip(strip_id)
+        strip_length = len(buffer)
         # Start with a dark base - slight blue tint
         buffer[:] = [0.0, 0.0, 0.1, 0.1]  # Very dim blue base
+
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'charge_level': 0.0,
+                    'charging': True,
+                    'discharge_timer': 0.0,
+                    'next_discharge': 2.0 + np.random.random() * 3.0,  # 2-5 seconds between discharges
+                    'base_glow': 0.2,
+                    'arc_positions': []  # Track small electrical arcs
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update charge/discharge cycle
+            if spots['charging']:
+                # Slowly build charge
+                spots['charge_level'] += delta_time / 2.0  # 2 seconds to full charge
+                spots['charge_level'] = min(1.0, spots['charge_level'])
+                
+                # Check if ready to discharge
+                spots['discharge_timer'] += delta_time
+                if spots['discharge_timer'] >= spots['next_discharge']:
+                    spots['charging'] = False
+                    spots['discharge_timer'] = 0.0
+                    # Create some arc positions for the discharge
+                    spots['arc_positions'] = [np.random.randint(0, strip_length) 
+                                             for _ in range(np.random.randint(2, 5))]
+            else:
+                # Discharging - faster than charging
+                spots['charge_level'] -= delta_time * 3.0  # 0.33 seconds to discharge
+                
+                if spots['charge_level'] <= 0:
+                    spots['charge_level'] = 0.0
+                    spots['charging'] = True
+                    spots['next_discharge'] = 2.0 + np.random.random() * 3.0
+                    spots['arc_positions'] = []
+            
+            # Choose color based on charge level
+            if spots['charge_level'] < 0.3:
+                # Low charge - deep blue
+                h, s, v = instate['colors']['electric_blue']
+            elif spots['charge_level'] < 0.7:
+                # Medium charge - lighter blue
+                h, s, v = instate['colors']['light_blue']
+            else:
+                # High charge - yellow/white
+                if spots['charging']:
+                    h, s, v = instate['colors']['pale_yellow']
+                else:
+                    h, s, v = instate['colors']['white_hot']
+            
+            # Adjust brightness based on charge
+            v *= (spots['base_glow'] + spots['charge_level'] * 0.8)
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v)
+            
+            # Apply base color to whole strip
+            buffer[:] = [r, g, b, 0.3 + spots['charge_level'] * 0.5]
+            
+            # Add arc effects during discharge
+            if not spots['charging'] and spots['arc_positions']:
+                arc_h, arc_s, arc_v = instate['colors']['white_hot']
+                arc_r, arc_g, arc_b = hsv_to_rgb(arc_h, arc_s, arc_v)
+                
+                for arc_pos in spots['arc_positions']:
+                    # Draw small electrical arc
+                    arc_size = 3
+                    for offset in range(-arc_size, arc_size + 1):
+                        pos = (arc_pos + offset) % strip_length
+                        intensity = 1.0 - abs(offset) / arc_size
+                        buffer[pos] = [
+                            min(1.0, r + arc_r * intensity * 0.5),
+                            min(1.0, g + arc_g * intensity * 0.5),
+                            min(1.0, b + arc_b * intensity * 0.5),
+                            min(1.0, 0.8 * intensity)
+                        ]
+            
+            continue  # Skip regular processing for spots strips
+
         
         if is_active:
             # This strip is active
@@ -2421,7 +2759,9 @@ def OTO_contemplative_cosmic(instate, outstate):
         instate['color_flows'] = {}     # Track flowing color smears
         instate['fireflies'] = {}       # Track moving fireflies
         instate['active_strips'] = set()  # Track which strips are active
+        instate['spots_state'] = {}     # Track slow nebula for spots strips
         
+
         # Color palette (HSV values)
         instate['colors'] = {
             'white_star': [0.0, 0.0, 1.0],          # Pure white
@@ -2526,6 +2866,97 @@ def OTO_contemplative_cosmic(instate, outstate):
         
         # Start with a dark base - very deep blue
         buffer[:] = [0.0, 0.0, 0.1, 0.2]  # Very dim blue base
+
+        if 'spots' in strip.groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'nebula_colors': [
+                        np.random.choice(['blue_deep', 'blue_light', 'green_cosmic', 'purple_cosmic']),
+                        np.random.choice(['orange_nebula', 'teal_cosmic', 'green_deep'])
+                    ],
+                    'blend_factor': 0.5,
+                    'blend_direction': 1,
+                    'blend_speed': 0.05,  # Very slow blending
+                    'shimmer_phase': np.random.random() * 2 * np.pi,
+                    'star_positions': [np.random.randint(0, strip_length) 
+                                     for _ in range(max(2, strip_length // 20))],
+                    'star_phases': [np.random.random() * 2 * np.pi 
+                                  for _ in range(max(2, strip_length // 20))]
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update blend factor
+            spots['blend_factor'] += spots['blend_speed'] * spots['blend_direction'] * delta_time
+            
+            # Reverse direction at boundaries
+            if spots['blend_factor'] >= 1.0:
+                spots['blend_factor'] = 1.0
+                spots['blend_direction'] = -1
+                # Pick new second color
+                color_options = ['orange_nebula', 'teal_cosmic', 'green_deep', 'yellow_glow']
+                spots['nebula_colors'][1] = np.random.choice(color_options)
+            elif spots['blend_factor'] <= 0.0:
+                spots['blend_factor'] = 0.0
+                spots['blend_direction'] = 1
+                # Pick new first color
+                color_options = ['blue_deep', 'blue_light', 'green_cosmic', 'purple_cosmic']
+                spots['nebula_colors'][0] = np.random.choice(color_options)
+            
+            # Update shimmer
+            spots['shimmer_phase'] += delta_time * 0.2  # Very slow shimmer
+            
+            # Get nebula colors
+            h1, s1, v1 = instate['colors'][spots['nebula_colors'][0]]
+            h2, s2, v2 = instate['colors'][spots['nebula_colors'][1]]
+            
+            # Smooth blend using cosine interpolation
+            blend = 0.5 + 0.5 * np.cos(spots['blend_factor'] * np.pi)
+            
+            # Handle hue wrapping
+            h_diff = h2 - h1
+            if abs(h_diff) > 0.5:
+                if h1 > h2:
+                    h2 += 1.0
+                else:
+                    h1 += 1.0
+            
+            # Interpolate colors
+            h = (h1 * blend + h2 * (1 - blend)) % 1.0
+            s = s1 * blend + s2 * (1 - blend)
+            v = v1 * blend + v2 * (1 - blend)
+            
+            # Add shimmer effect
+            shimmer = 0.9 + 0.1 * np.sin(spots['shimmer_phase'])
+            v *= shimmer
+            
+            # Convert to RGB
+            r, g, b = hsv_to_rgb(h, s, v)
+            
+            # Apply nebula to entire strip
+            buffer[:] = [r, g, b, 0.5]
+            
+            # Add static stars (slow twinkling)
+            for i, star_pos in enumerate(spots['star_positions']):
+                # Update star phase slowly
+                spots['star_phases'][i] += delta_time * 0.3
+                
+                # Calculate star brightness
+                brightness = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(spots['star_phases'][i]))
+                
+                # Draw star
+                star_h, star_s, star_v = instate['colors']['white_star']
+                star_r, star_g, star_b = hsv_to_rgb(star_h, star_s, star_v * brightness)
+                
+                buffer[star_pos] = [
+                    max(r, star_r),
+                    max(g, star_g),
+                    max(b, star_b),
+                    max(0.5, brightness * 0.8)
+                ]
+            
+            continue  # Skip regular processing for spots strips
         
         # Initialize elements for this strip if not already done
         if strip_id not in instate['stars']:
@@ -2958,6 +3389,7 @@ def OTO_neutral_positive(instate, outstate):
         instate['brain_pulse'] = {}       # Track brain pulse state
         instate['water_ripples'] = {}     # Track water ripple effects
         instate['flash_timer'] = 0.0      # Timer for occasional flashes
+        instate['spots_state'] = {} 
         
         # Color palette (HSV values)
         instate['colors'] = {
@@ -3032,6 +3464,74 @@ def OTO_neutral_positive(instate, outstate):
         strip = strip_manager.get_strip(strip_id)
         strip_length = len(buffer)
         strip_groups = strip.groups
+
+        if 'spots' in strip_groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'sun_phase': np.random.random() * 2 * np.pi,
+                    'color_phase': 0.0,
+                    'current_palette': 'morning',  # morning, noon, evening
+                    'palette_timer': 0.0,
+                    'dappled_light': [np.random.random() for _ in range(strip_length)]
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update sun phase (gentle breathing)
+            spots['sun_phase'] += delta_time * 0.25  # Very slow pulse
+            
+            # Update palette timer
+            spots['palette_timer'] += delta_time
+            if spots['palette_timer'] > 12.0:  # Change every 12 seconds
+                spots['palette_timer'] = 0.0
+                # Cycle through times of day
+                if spots['current_palette'] == 'morning':
+                    spots['current_palette'] = 'noon'
+                elif spots['current_palette'] == 'noon':
+                    spots['current_palette'] = 'evening'
+                else:
+                    spots['current_palette'] = 'morning'
+            
+            # Get base color based on palette
+            if spots['current_palette'] == 'morning':
+                # Soft golden morning light
+                h, s, v = instate['colors']['golden_sun']
+                s *= 0.7  # Softer saturation
+            elif spots['current_palette'] == 'noon':
+                # Bright sunshine
+                h, s, v = instate['colors']['sunshine_yellow']
+                v *= 0.9  # Slightly less intense
+            else:  # evening
+                # Warm golden hour
+                h, s, v = instate['colors']['golden_sun']
+                h += 0.02  # Shift slightly toward orange
+                s *= 0.9
+            
+            # Calculate sun intensity
+            sun_intensity = 0.6 + 0.4 * (0.5 + 0.5 * np.sin(spots['sun_phase']))
+            v *= sun_intensity
+            
+            # Apply dappled light effect (like through leaves)
+            for pixel in range(strip_length):
+                # Slowly vary the dappled pattern
+                spots['dappled_light'][pixel] += (np.random.random() - 0.5) * 0.01
+                spots['dappled_light'][pixel] = max(0.3, min(1.0, spots['dappled_light'][pixel]))
+                
+                # Apply dappled effect
+                pixel_v = v * spots['dappled_light'][pixel]
+                
+                # Convert to RGB
+                r, g, b = hsv_to_rgb(h, s, pixel_v)
+                
+                # Add slight green tint occasionally (foliage effect)
+                if spots['dappled_light'][pixel] < 0.5:
+                    g += 0.1
+                    g = min(1.0, g)
+                
+                buffer[pixel] = [r, g, b, 0.6]
+            
+            continue  # Skip regular processing for spots strips
         
         # Initialize elements for this strip if not already done
         if strip_id not in instate['sun_rays']:
@@ -3500,7 +4000,7 @@ def OTO_danger_pulse(instate, outstate):
         # Initialize parameters
         instate['pulse_phase'] = 0.0      # Current phase of the pulse (0.0-1.0)
         instate['pulse_speed'] = 0.5      # Pulses per second (adjust for faster/slower)
-        
+        instate['spots_state'] = {}   
         return
 
     if instate['count'] == -1:
@@ -3547,6 +4047,51 @@ def OTO_danger_pulse(instate, outstate):
         # Skip if strip doesn't exist in manager
         if strip_id not in strip_manager.strips:
             continue
+
+        strip = strip_manager.get_strip(strip_id)
+        strip_groups = strip.groups
+        
+        # Special handling for spots strips - much slower, gentler pulse
+        if 'spots' in strip_groups:
+            # Initialize spots state if not already done
+            if strip_id not in instate['spots_state']:
+                instate['spots_state'][strip_id] = {
+                    'pulse_phase': np.random.random() * 2 * np.pi,  # Random starting phase
+                    'pulse_speed': 0.1 + np.random.random() * 0.05,  # 0.1-0.15 Hz (very slow)
+                    'base_brightness': 0.3,  # Dimmer base level
+                    'pulse_amplitude': 0.2   # Smaller variation (30% to 50% brightness)
+                }
+            
+            spots = instate['spots_state'][strip_id]
+            
+            # Update spots pulse phase (much slower)
+            spots['pulse_phase'] += spots['pulse_speed'] * delta_time
+            spots['pulse_phase'] %= 1.0
+            
+            # Calculate spots brightness with smaller variation
+            # Using smoother cosine wave for even gentler transition
+            spots_brightness = spots['base_brightness'] + spots['pulse_amplitude'] * (
+                0.5 + 0.5 * np.cos(spots['pulse_phase'] * 2 * np.pi)
+            )
+            
+            # Apply a warmer, less intense red for spots
+            spots_r = 0.8  # Slightly less intense red
+            spots_g = 0.1  # Tiny bit of green for warmth
+            spots_b = 0.0
+            
+            # Fill buffer with gentler pulsing
+            buffer[:] = [
+                spots_r * spots_brightness, 
+                spots_g * spots_brightness, 
+                spots_b * spots_brightness, 
+                0.6  # Lower alpha for spots
+            ]
+            
+        else:
+            # Regular strips - normal danger pulse
+            # Fill buffer with pulsing red at calculated brightness
+            buffer[:] = [r * brightness, g * brightness, b * brightness, 0.8]
+
             
         # Fill buffer with pulsing red at calculated brightness
         buffer[:] = [r * brightness, g * brightness, b * brightness, 0.8]
