@@ -168,7 +168,7 @@ class SACNPixelSender:
         :param output_buffers: Dictionary mapping strip_id to buffer arrays
         :param strip_info: List of tuples (strip_id, length, direction, type)
         """
-        gamma = 2.2
+        gamma = 2
         
         # Group RGB4 receivers by output
         rgb4_by_output = {}
@@ -311,8 +311,8 @@ class SACNPixelSender:
                 
                 # Create RGBW data with W set to 0
                 rgbw_data = np.zeros((universe_data.shape[0], 4), dtype=np.uint8)
-                rgbw_data[:, :3] = universe_data  # Set RGB components
-                
+                #rgbw_data[:, :3] = universe_data  # Set RGB components
+                rgbw_data[:, [1,0,2]] = universe_data  # Set RGB components
                 # Flatten the RGBW data
                 universe_data = rgbw_data.flatten()
                 
