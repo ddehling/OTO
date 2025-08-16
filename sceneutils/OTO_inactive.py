@@ -574,7 +574,8 @@ def OTO_awaken(instate, outstate):
     1. Base groups: Movement flows between bottom, middle, and top strips
     2. Ear strips: Spinning movement when control_sensor is active
     3. Head strips: Slow random frequency pulsing with silvery color
-    4. Alpha level controlled by outstate['control_mode_awaken']
+    4. Spots strips: Gentle, slow transitions matching the awakening theme
+    5. Alpha level controlled by outstate['control_mode_awaken']
     
     The pattern creates a flow of energy moving from bottom strips to middle strips
     to top strips, simulating an awakening or activation sequence.
@@ -598,13 +599,25 @@ def OTO_awaken(instate, outstate):
         instate['base_top_strips'] = []
         instate['ear_strips'] = []
         instate['head_strips'] = []
+        instate['spots_strips'] = []
         instate['head_pulse_rates'] = {}  # Store random pulse rates for head strips
+        instate['spots_state'] = {}       # Store state for spots strips
         
         # Identify and categorize strips
         for strip_id in strip_manager.strips:
             strip = strip_manager.get_strip(strip_id)
             
-            if 'base' in strip.groups:
+            if 'spots' in strip.groups:
+                instate['spots_strips'].append(strip_id)
+                # Initialize spots state with random parameters
+                instate['spots_state'][strip_id] = {
+                    'glow_phase': np.random.random() * 2 * np.pi,
+                    'glow_speed': 0.1 + np.random.random() * 0.05,  # 0.1-0.15 Hz
+                    'color_transition': 0.0,
+                    'color_direction': 1,
+                    'base_brightness': 0.3
+                }
+            elif 'base' in strip.groups:
                 if 'bottom' in strip.groups:
                     instate['base_bottom_strips'].append(strip_id)
                 elif 'middle' in strip.groups:
@@ -706,8 +719,63 @@ def OTO_awaken(instate, outstate):
         strip = strip_manager.get_strip(strip_id)
         strip_length = len(buffer)
         
+        # Special handling for spots strips - gentle awakening glow
+        if strip_id in instate['spots_strips']:
+            spots = instate['spots_state'][strip_id]
+            
+            # Update glow phase
+            spots['glow_phase'] += spots['glow_speed'] * delta_time * 2 * np.pi
+            
+            # Update color transition (slow transition between cyan tones)
+            spots['color_transition'] += spots['color_direction'] * delta_time / 5.0  # 5 second transitions
+            
+            # Reverse direction at boundaries
+            if spots['color_transition'] >= 1.0:
+                spots['color_transition'] = 1.0
+                spots['color_direction'] = -1
+            elif spots['color_transition'] <= 0.0:
+                spots['color_transition'] = 0.0
+                spots['color_direction'] = 1
+            
+            # Calculate glow intensity with very gentle variation
+            glow = spots['base_brightness'] + 0.15 * (0.5 + 0.5 * np.sin(spots['glow_phase']))
+            
+            # Smoothly interpolate between two cyan-blue shades
+            t = spots['color_transition']
+            # Use smoothstep for even smoother transitions
+            t = t * t * (3.0 - 2.0 * t)
+            
+            # Color 1: Deep cyan-blue
+            r1, g1, b1 = 0.0, 0.4, 0.6
+            # Color 2: Lighter cyan
+            r2, g2, b2 = 0.1, 0.6, 0.8
+            
+            # Interpolate
+            r = r1 + (r2 - r1) * t
+            g = g1 + (g2 - g1) * t
+            b = b1 + (b2 - b1) * t
+            
+            # Apply glow intensity
+            r *= glow
+            g *= glow
+            b *= glow
+            
+            # Add subtle variation across the strip (very gentle)
+            for i in range(strip_length):
+                # Create subtle position-based variation
+                pos_variation = 0.95 + 0.05 * np.sin(i / strip_length * np.pi * 2 + spots['glow_phase'] * 0.5)
+                
+                buffer[i] = [
+                    r * pos_variation,
+                    g * pos_variation,
+                    b * pos_variation,
+                    glow * 0.7  # Lower alpha for softer appearance
+                ]
+            
+            continue  # Skip other processing for spots strips
+        
         # Base strip processing - determine which section it belongs to
-        if strip_id in instate['base_bottom_strips']:
+        elif strip_id in instate['base_bottom_strips']:
             # Bottom strips - pulsing cyan-blue with intensity based on flow
             intensity = bottom_intensity * 0.8  # Scale for visual balance
             
