@@ -305,6 +305,7 @@ class StripManager:
             # Group strips by type
             rgb_strips = [s for s in strips if s.metadata.get('Type', 'RGB') == 'RGB']
             rgbw_strips = [s for s in strips if s.metadata.get('Type', 'RGBW') == 'RGBW']
+            rgbw3_strips = [s for s in strips if s.metadata.get('Type', 'RGBW3') == 'RGBW3']
             dmx_strips = [s for s in strips if s.metadata.get('Type', 'DMX') == 'DMX']
             rgb4_strips = [s for s in strips if s.metadata.get('Type', 'RGB4') == 'RGB4']
             
@@ -313,45 +314,109 @@ class StripManager:
             
             # Add RGB receiver if needed
             if rgb_strips:
-                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in rgb_strips)
-                rgb_receiver = {
-                    'ip': ip,
-                    'pixel_count': sum(strip.length for strip in rgb_strips),
-                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGB') 
-                                for strip in rgb_strips],
-                    'type': 'RGB',
-                    'strip_ids': [s.id for s in rgb_strips],
-                    'strip_num_start': min_strip_num
-                }
-                receivers.append(rgb_receiver)
+                # Group RGB strips by output if specified
+                output_groups = {}
+                for strip in rgb_strips:
+                    output = strip.metadata.get('Output', 'default')
+                    if output not in output_groups:
+                        output_groups[output] = []
+                    output_groups[output].append(strip)
+                
+                for output, group_strips in output_groups.items():
+                    group_strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+                    min_strip_num = min(s.metadata.get('Strip_num', 0) for s in group_strips)
+                    
+                    rgb_receiver = {
+                        'ip': ip,
+                        'pixel_count': sum(strip.length for strip in group_strips),
+                        'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGB') 
+                                    for strip in group_strips],
+                        'type': 'RGB',
+                        'output': output if output != 'default' else None,
+                        'strip_ids': [s.id for s in group_strips],
+                        'strip_num_start': min_strip_num
+                    }
+                    receivers.append(rgb_receiver)
             
             # Add RGBW receiver if needed
             if rgbw_strips:
-                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in rgbw_strips)
-                rgbw_receiver = {
-                    'ip': ip,
-                    'pixel_count': sum(strip.length for strip in rgbw_strips),
-                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGBW') 
-                                for strip in rgbw_strips],
-                    'type': 'RGBW',
-                    'strip_ids': [s.id for s in rgbw_strips],
-                    'strip_num_start': min_strip_num
-                }
-                receivers.append(rgbw_receiver)
+                # Group RGBW strips by output if specified
+                output_groups = {}
+                for strip in rgbw_strips:
+                    output = strip.metadata.get('Output', 'default')
+                    if output not in output_groups:
+                        output_groups[output] = []
+                    output_groups[output].append(strip)
+                
+                for output, group_strips in output_groups.items():
+                    group_strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+                    min_strip_num = min(s.metadata.get('Strip_num', 0) for s in group_strips)
+                    
+                    rgbw_receiver = {
+                        'ip': ip,
+                        'pixel_count': sum(strip.length for strip in group_strips),
+                        'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGBW') 
+                                    for strip in group_strips],
+                        'type': 'RGBW',
+                        'output': output if output != 'default' else None,
+                        'strip_ids': [s.id for s in group_strips],
+                        'strip_num_start': min_strip_num
+                    }
+                    receivers.append(rgbw_receiver)
+            
+            # Handle RGBW3 strips - group by Output for continuous packing
+            if rgbw3_strips:
+                # Group RGBW3 strips by Output
+                output_groups = {}
+                for strip in rgbw3_strips:
+                    output = strip.metadata.get('Output', 'default')
+                    if output not in output_groups:
+                        output_groups[output] = []
+                    output_groups[output].append(strip)
+                
+                # Create a receiver for each output group
+                for output, group_strips in output_groups.items():
+                    # Sort strips within output group by Strip_num
+                    group_strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+                    min_strip_num = min(s.metadata.get('Strip_num', 0) for s in group_strips)
+                    
+                    rgbw3_receiver = {
+                        'ip': ip,
+                        'pixel_count': sum(strip.length for strip in group_strips),
+                        'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'RGBW3') 
+                                    for strip in group_strips],
+                        'type': 'RGBW3',
+                        'output': output,
+                        'strip_ids': [strip.id for strip in group_strips],
+                        'strip_num_start': min_strip_num
+                    }
+                    receivers.append(rgbw3_receiver)
             
             # Add DMX receiver if needed
             if dmx_strips:
-                min_strip_num = min(s.metadata.get('Strip_num', 0) for s in dmx_strips)
-                dmx_receiver = {
-                    'ip': ip,
-                    'pixel_count': sum(strip.length for strip in dmx_strips),
-                    'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'DMX') 
-                                for strip in dmx_strips],
-                    'type': 'DMX',
-                    'strip_ids': [s.id for s in dmx_strips],
-                    'strip_num_start': min_strip_num
-                }
-                receivers.append(dmx_receiver)
+                # Group DMX strips by output if specified
+                output_groups = {}
+                for strip in dmx_strips:
+                    output = strip.metadata.get('Output', 'default')
+                    if output not in output_groups:
+                        output_groups[output] = []
+                    output_groups[output].append(strip)
+                
+                for output, group_strips in output_groups.items():
+                    group_strips.sort(key=lambda s: s.metadata.get('Strip_num', 0))
+                    min_strip_num = min(s.metadata.get('Strip_num', 0) for s in group_strips)
+                    
+                    dmx_receiver = {
+                        'ip': ip,
+                        'pixel_count': sum(strip.length for strip in group_strips),
+                        'strip_info': [(strip.id, strip.length, strip.metadata.get('Direction', 1), 'DMX') 
+                                    for strip in group_strips],
+                        'type': 'DMX',
+                        'output': output if output != 'default' else None,
+                        'strip_ids': [s.id for s in group_strips],
+                        'strip_num_start': min_strip_num
+                    }
+                    receivers.append(dmx_receiver)
             
             # Handle RGB4 strips - group by Output
             if rgb4_strips:
@@ -397,9 +462,45 @@ class StripManager:
             
             # Print info about this IP's strips
             strip_types = []
-            if rgb_strips: strip_types.append(f"RGB ({sum(s.length for s in rgb_strips)} pixels)")
-            if rgbw_strips: strip_types.append(f"RGBW ({sum(s.length for s in rgbw_strips)} pixels)")
-            if dmx_strips: strip_types.append(f"DMX ({sum(s.length for s in dmx_strips)} pixels)")
+            if rgb_strips: 
+                outputs = {}
+                for s in rgb_strips:
+                    output = s.metadata.get('Output', 'default')
+                    if output not in outputs:
+                        outputs[output] = 0
+                    outputs[output] += s.length
+                for output, count in outputs.items():
+                    strip_types.append(f"RGB{f' Output {output}' if output != 'default' else ''} ({count} pixels)")
+                    
+            if rgbw_strips:
+                outputs = {}
+                for s in rgbw_strips:
+                    output = s.metadata.get('Output', 'default')
+                    if output not in outputs:
+                        outputs[output] = 0
+                    outputs[output] += s.length
+                for output, count in outputs.items():
+                    strip_types.append(f"RGBW{f' Output {output}' if output != 'default' else ''} ({count} pixels)")
+                    
+            if rgbw3_strips:
+                outputs = {}
+                for s in rgbw3_strips:
+                    output = s.metadata.get('Output', 'default')
+                    if output not in outputs:
+                        outputs[output] = 0
+                    outputs[output] += s.length
+                for output, count in outputs.items():
+                    strip_types.append(f"RGBW3 Output {output} ({count} pixels)")
+                    
+            if dmx_strips:
+                outputs = {}
+                for s in dmx_strips:
+                    output = s.metadata.get('Output', 'default')
+                    if output not in outputs:
+                        outputs[output] = 0
+                    outputs[output] += s.length
+                for output, count in outputs.items():
+                    strip_types.append(f"DMX{f' Output {output}' if output != 'default' else ''} ({count} pixels)")
             
             # Show RGB4 strips by output
             if rgb4_strips:
@@ -431,6 +532,7 @@ class StripManager:
                 print(f"Error creating DMX sender for {ip}: {e}")
         
         return senders
+
 
     def concatenate_strips(self, new_id: str, strip_ids: List[str], join_group: str = None) -> None:
         """
