@@ -564,8 +564,6 @@ def OTO_generic_pattern(instate, outstate):
             # Set pixel color (RGBA format)
             buffer[i] = [intensity, intensity * 0.8, intensity * 0.5, intensity]
 
-
-# ... existing code ...
 def OTO_awaken(instate, outstate):
     """
     Awakening pattern generator with movement between base strips and ear animations.
