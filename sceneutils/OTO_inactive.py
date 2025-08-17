@@ -565,6 +565,7 @@ def OTO_generic_pattern(instate, outstate):
             # Set pixel color (RGBA format)
             buffer[i] = [intensity, intensity * 0.8, intensity * 0.5, intensity]
 
+
 def OTO_awaken(instate, outstate):
     """
     Awakening pattern generator with movement between base strips and ear animations.
@@ -614,7 +615,7 @@ def OTO_awaken(instate, outstate):
                     'glow_speed': 0.1 + np.random.random() * 0.05,  # 0.1-0.15 Hz
                     'color_transition': 0.0,
                     'color_direction': 1,
-                    'base_brightness': 0.3
+                    'base_brightness': 0.6
                 }
             elif 'base' in strip.groups:
                 if 'bottom' in strip.groups:
