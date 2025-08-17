@@ -297,18 +297,26 @@ class LED3DOpenGLWidget(QOpenGLWidget):
             glLineWidth(1.0)
             glEnable(GL_LIGHTING)  # Re-enable lighting
             
+            # Determine LED sphere size based on strip type
+            strip_type = strip.metadata.get('Type', 'RGB')
+            if strip_type == 'DMX':
+                led_radius = 4  # Much larger radius for DMX pixels
+            else:
+                led_radius = 0.4  # Standard radius for RGB/RGBW pixels
+            
             # Draw LED spheres if colors are available
             if colors is not None:
                 for i, pos in enumerate(strip.coordinates):
                     if i < len(colors):
                         color = colors[i]
-                        self._draw_led_sphere(pos, 0.35, color)
+                        self._draw_led_sphere(pos, led_radius, color)
             
             # Draw strip ID using billboard technique (facing camera)
             if len(strip.coordinates) > 0:
                 # Use the first LED position for the label
                 pos = strip.coordinates[0]  
                 self._draw_billboard_text(strip_id, pos[0], pos[1] + 0.3, pos[2])
+
     
     def _draw_led_sphere(self, position, radius, color):
         """Draw a sphere at the given position with the given color"""
