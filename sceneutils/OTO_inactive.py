@@ -2,9 +2,6 @@ from sceneutils.imgutils import *  # noqa: F403
 import numpy as np
 from pathlib import Path
 
-
-# ... existing code ...
-
 def OTO_inactive_pattern_cycle(instate, outstate):
     """
     Generator that cycles between multiple pattern generators over time.
@@ -111,15 +108,16 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 is_spots = 'spots' in strip.groups if strip else False
                 
                 if is_spots:
-                    # Initialize spots state if needed
+                    # Initialize spots state if needed - proper nested initialization
                     if strip_id not in instate['spots_state']:
-                        instate['spots_state'][strip_id] = {
-                            'pattern_0': {
-                                'glow_phase': np.random.random() * 2 * np.pi,
-                                'glow_speed': 0.15,  # Very slow glow
-                                'base_brightness': 0.3,
-                                'color': [0.9, 0.9, 0.8]  # Warm white
-                            }
+                        instate['spots_state'][strip_id] = {}
+                    
+                    if 'pattern_0' not in instate['spots_state'][strip_id]:
+                        instate['spots_state'][strip_id]['pattern_0'] = {
+                            'glow_phase': np.random.random() * 2 * np.pi,
+                            'glow_speed': 0.15,  # Very slow glow
+                            'base_brightness': 0.3,
+                            'color': [0.9, 0.9, 0.8]  # Warm white
                         }
                     
                     spots = instate['spots_state'][strip_id]['pattern_0']
@@ -196,9 +194,10 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 is_spots = 'spots' in strip.groups if strip else False
                 
                 if is_spots:
-                    # Initialize spots state if needed
+                    # Initialize spots state if needed - proper nested initialization
                     if strip_id not in instate['spots_state']:
                         instate['spots_state'][strip_id] = {}
+                        
                     if 'pattern_1' not in instate['spots_state'][strip_id]:
                         instate['spots_state'][strip_id]['pattern_1'] = {
                             'position': 0.0,
@@ -298,9 +297,10 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 is_spots = 'spots' in strip.groups if strip else False
                 
                 if is_spots:
-                    # Initialize spots state if needed
+                    # Initialize spots state if needed - proper nested initialization
                     if strip_id not in instate['spots_state']:
                         instate['spots_state'][strip_id] = {}
+                        
                     if 'pattern_2' not in instate['spots_state'][strip_id]:
                         instate['spots_state'][strip_id]['pattern_2'] = {
                             'phase': np.random.random(),
@@ -370,9 +370,10 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 strip_length = len(buffer)
                 
                 if is_spots:
-                    # Initialize spots state if needed
+                    # Initialize spots state if needed - proper nested initialization
                     if strip_id not in instate['spots_state']:
                         instate['spots_state'][strip_id] = {}
+                        
                     if 'pattern_3' not in instate['spots_state'][strip_id]:
                         instate['spots_state'][strip_id]['pattern_3'] = {
                             'hue': np.random.random(),
@@ -420,9 +421,10 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                 is_spots = 'spots' in strip.groups if strip else False
                 
                 if is_spots:
-                    # Initialize spots state if needed
+                    # Initialize spots state if needed - proper nested initialization
                     if strip_id not in instate['spots_state']:
                         instate['spots_state'][strip_id] = {}
+                        
                     if 'pattern_4' not in instate['spots_state'][strip_id]:
                         instate['spots_state'][strip_id]['pattern_4'] = {
                             'pulse_phase': 0.0,
@@ -498,7 +500,6 @@ def OTO_inactive_pattern_cycle(instate, outstate):
                             'width': 5 + int(np.random.random() * 10),  # 5-15 pixels wide
                             'hue': np.random.random()  # Random color
                         })
-
 
 # ... existing code ...
 
