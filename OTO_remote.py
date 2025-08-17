@@ -173,18 +173,18 @@ if __name__ == "__main__":
     scheduler.setup_visualizer(False) 
     # Start with summer bloom weather
    
-    env_system.scheduler.schedule_event(0, 8000000, OTO_heartbeat)# noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_danger_pulse)  # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_sunrise_joy) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_sad_theme) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_angry_theme) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_curious_playful) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_passionate_floral) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_rage_lightning) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_contemplative_cosmic) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_neutral_positive) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_inactive_pattern_cycle) # noqa: F405
-    env_system.scheduler.schedule_event(00, 8000000, OTO_awaken) # noqa: F405
+    env_system.scheduler.schedule_event(0, 800000000, OTO_heartbeat)# noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_danger_pulse)  # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_sunrise_joy) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_sad_theme) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_angry_theme) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_curious_playful) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_passionate_floral) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_rage_lightning) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_contemplative_cosmic) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_neutral_positive) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_inactive_pattern_cycle) # noqa: F405
+    env_system.scheduler.schedule_event(00, 800000000, OTO_awaken) # noqa: F405
     lasttime = time.perf_counter()
     FRAME_TIME = 1 / 40
     first_time = time.perf_counter()
